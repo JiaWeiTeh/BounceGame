@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.animation as animation
-import canvas
+import functions
 
 # =============================================================================
 # Initial setup
@@ -16,15 +16,15 @@ rad = 180
 # draw boundary
 fig = plt.figure(figsize = (7,7), dpi = 100)
 ax = plt.axes(xlim=(0-200, boardx+200), ylim=(0-200, boardy+200))
-canvas.draw(ax, rad, cent)
 ax.xaxis.set_ticks([])
 ax.yaxis.set_ticks([])
+functions.draw(ax, rad, cent)
 # plot ball
 plot_ball, = ax.plot([], [], 'o', mec = 'k', mfc = 'w', ms = 10)
 # initialize timestep
 dt = 0
 # initial velocity
-vel = 10
+v0 = 10
 # launch angle
 theta = np.deg2rad(45)
 # gravitational acceleration
@@ -32,26 +32,6 @@ g = 2
 # coeff of restitution
 e = 0.9
 
-
-def get_vel(t, theta):
-    """
-    Return velocity component at time t given intial launching angle.
-    """
-    xvel = vel * np.cos(theta)
-    yvel = vel * np.sin(theta) - g * t
-    
-    return xvel, yvel
-    
-    
-def get_pos(t, theta, x0, y0):
-    """
-    Return position (x,y) at time t given initial launching angle and position.
-    
-    """
-    xpos = vel * np.cos(theta) * t + x0
-    ypos = vel * np.sin(theta) * t - 0.5 * g * t**2 + y0
-    
-    return xpos, ypos
 
 # =============================================================================
 # Initial condition
@@ -68,15 +48,15 @@ def init():
 xInit, yInit = [200,200]
 
 def animate(i):
-    global dt, xInit, yInit, theta, vel
+    global dt, xInit, yInit, theta, v0, g
     dt += .2
-    xpos, ypos = get_pos(dt, theta, xInit, yInit)
+    xpos, ypos = functions.get_pos(dt, theta, xInit, yInit, v0, g)
     
-    if (np.sqrt((xpos-mid)**2 + (ypos-mid)**2)) >= (rad-10):
+    if (np.sqrt((xpos-cent)**2 + (ypos-cent)**2)) >= (rad-10):
         
         # 2. calculate gradient from point to mid. This will be the 
         # norm of contact point
-        norm = (ypos - mid)/(xpos - mid)
+        norm = (ypos - cent)/(xpos - cent)
         # 3. instantaneous gradient of circular boundary at point of contact
         grad = -1/norm
         # 4. gradient of ball
@@ -88,9 +68,9 @@ def animate(i):
         dt = .2
         xInit, yInit = [xpos, ypos]
         # 7. account for energy loss
-        vel *= e
+        v0 *= e
         # 8. recalculate and plot
-        xpos, ypos = get_pos(dt, theta, xInit, yInit)
+        xpos, ypos = functions.get_pos(dt, theta, xInit, yInit, v0, g)
         plot_ball.set_data(xpos,ypos)
         
         return plot_ball,
@@ -109,9 +89,9 @@ anim = animation.FuncAnimation(fig, animate, init_func=init,
 # =============================================================================
 # Save movie
 # =============================================================================
-path2save = r"/Users/jwt/Documents/Code/Bounce_Game/"
-anim.save(path2save+'stage4.mp4', fps=30,
-          extra_args=['-vcodec', 'libx264'])
+# path2save = r"/Users/jwt/Documents/Code/Bounce_Game/"
+# anim.save(path2save+'stage4.mp4', fps=30,
+#           extra_args=['-vcodec', 'libx264'])
 
 
 
