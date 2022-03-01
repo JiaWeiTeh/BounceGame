@@ -45,12 +45,12 @@ def init():
 # Animation
 # =============================================================================
 
-xInit, yInit = [200,200]
+x0, y0 = [200,200]
 
 def animate(i):
-    global dt, xInit, yInit, theta, v0, g
+    global dt, x0, y0, theta, v0, g
     dt += .2
-    xpos, ypos = functions.get_pos(dt, theta, xInit, yInit, v0, g)
+    xpos, ypos = functions.get_pos(dt, theta, x0, y0, v0, g)
     
     if (np.sqrt((xpos-cent)**2 + (ypos-cent)**2)) >= (rad-10):
         
@@ -64,13 +64,13 @@ def animate(i):
         # 5. collision angle = reflect + angle w.r.t. horizon
         theta = np.arctan(abs((grad_ball  - grad)/(1 + grad_ball*grad))) +\
             np.arctan(abs(grad))
-        # 6. reset t = 0 for equation of motion. Reset also x0, y0
+        # 6. reset to next(t = 0) for equation of motion. Reset also x0, y0
         dt = .2
-        xInit, yInit = [xpos, ypos]
+        x0, y0 = [xpos, ypos]
         # 7. account for energy loss
         v0 *= e
         # 8. recalculate and plot
-        xpos, ypos = functions.get_pos(dt, theta, xInit, yInit, v0, g)
+        xpos, ypos = functions.get_pos(dt, theta, x0, y0, v0, g)
         plot_ball.set_data(xpos,ypos)
         
         return plot_ball,
