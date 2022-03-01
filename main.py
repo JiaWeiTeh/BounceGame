@@ -22,13 +22,14 @@ functions.draw(ax, rad, cent)
 # plot ball
 plot_ball, = ax.plot([], [], 'o', mec = 'k', mfc = 'w', ms = 10)
 # initialize timestep
-dt = 0
+t = 0
+dt = .5   # fast/slow motion by changing dt
 # initial velocity
 v0 = 10
 # launch angle
-theta = np.deg2rad(45)
+theta = np.deg2rad(-45)
 # gravitational acceleration
-g = 2
+g = 0.5
 # coeff of restitution
 e = 0.9
 
@@ -48,29 +49,46 @@ def init():
 x0, y0 = [200,200]
 
 def animate(i):
-    global dt, x0, y0, theta, v0, g
-    dt += .2
-    xpos, ypos = functions.get_pos(dt, theta, x0, y0, v0, g)
+    global t, x0, y0, theta, v0, g, dt
+    t += dt
+    xpos, ypos = functions.get_pos(t, theta, x0, y0, v0, g)
     
+    # if ball outisde boundary, reset equation of trajectory with following steps:
     if (np.sqrt((xpos-cent)**2 + (ypos-cent)**2)) >= (rad-10):
-        
-        # 2. calculate gradient from point to mid. This will be the 
+        # 1. calculate gradient from point to mid. This will be the 
         # norm of contact point
         norm = (ypos - cent)/(xpos - cent)
-        # 3. instantaneous gradient of circular boundary at point of contact
+        # 2. instantaneous gradient of circular boundary at point of contact
         grad = -1/norm
-        # 4. gradient of ball
+        # 3. gradient of ball
         grad_ball = ypos/xpos
-        # 5. collision angle = reflect + angle w.r.t. horizon
-        theta = np.arctan(abs((grad_ball  - grad)/(1 + grad_ball*grad))) +\
-            np.arctan(abs(grad))
-        # 6. reset to next(t = 0) for equation of motion. Reset also x0, y0
-        dt = .2
+        # 4. new angle calculation
+        # angle between ball path and circle
+        theta_reflect = np.arctan(abs((grad_ball  - grad)/(1 + grad_ball*grad)))
+        # angle between ball path and x-axis
+        theta_horizon = np.arctan(abs(grad))
+        xvel, yvel = functions.get_vel(t, theta, v0, g)
+        if xvel > 0 and xpos > cent:
+            theta = theta_reflect + np.arctan(abs(grad)) + 0 
+        elif xvel < 0 and xpos > cent:
+            if theta_horizon > np.pi:
+                theta = theta_reflect + theta_horizon + np.pi     
+            else:
+                theta = theta_reflect - theta_horizon + np.pi  
+        elif xvel > 0 and xpos < cent:
+            if theta_horizon < np.pi:
+                theta = theta_reflect + theta_horizon + (3/2) * np.pi
+            else:
+                theta = theta_reflect - theta_horizon + (3/2) * np.pi            
+        elif xvel < 0 and xpos < cent:
+            theta = theta_reflect + theta_horizon + (1/2) * np.pi
+        # 5. reset to next(t = 0) for equation of motion. Reset also x0, y0
+        t = dt
         x0, y0 = [xpos, ypos]
-        # 7. account for energy loss
+        # 6. account for energy loss
         v0 *= e
-        # 8. recalculate and plot
-        xpos, ypos = functions.get_pos(dt, theta, x0, y0, v0, g)
+        # 7. recalculate and plot
+        xpos, ypos = functions.get_pos(t, theta, x0, y0, v0, g)
         plot_ball.set_data(xpos,ypos)
         
         return plot_ball,
@@ -80,8 +98,8 @@ def animate(i):
     return plot_ball,
 
 anim = animation.FuncAnimation(fig, animate, init_func=init,
-                               frames=200, #change length of the animation
-                               interval=20, # change to slow/fast motion
+                               frames=500, #change length of the animation
+                               interval=5, # change to slow/fast motion
                                 blit=True,
                                 repeat = True
                                )
