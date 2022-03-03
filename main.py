@@ -9,10 +9,10 @@ import functions
 # Initial setup
 # =============================================================================
 # Dimension of board
-boardx, boardy = [400, 400]
+boardx, boardy = [800, 800]
 # Radius and center of circle
-cent = 200
-rad = 180
+cent = 400
+rad = 340
 # draw boundary
 fig = plt.figure(figsize = (7,7), dpi = 100)
 ax = plt.axes(xlim=(0-200, boardx+200), ylim=(0-200, boardy+200))
@@ -23,30 +23,31 @@ functions.draw(ax, rad, cent)
 plot_ball, = ax.plot([], [], 'o', mec = 'k', mfc = 'w', ms = 10)
 # initialize timestep
 t = 0
-dt = .5   # fast/slow motion by changing dt
+dt = .6   # fast/slow motion by changing dt
 # initial velocity
 v0 = 10
 # launch angle
-theta = np.deg2rad(-45)
+theta = np.deg2rad(0)
 # gravitational acceleration
 g = 0.5
 # coeff of restitution
-e = 0.9
-
+e = 0.99
+# initial position of ball
+x0, y0 = [400,400]
 
 # =============================================================================
 # Initial condition
 # =============================================================================
     
 def init():
-    plot_ball.set_data([200,200])
+    plot_ball.set_data(x0, y0)
     return plot_ball,
 
 # =============================================================================
 # Animation
 # =============================================================================
 
-x0, y0 = [200,200]
+
 
 def animate(i):
     global t, x0, y0, theta, v0, g, dt
@@ -54,8 +55,8 @@ def animate(i):
     xpos, ypos = functions.get_pos(t, theta, x0, y0, v0, g)
     
     # if ball outisde boundary, reset equation of trajectory with following steps:
-    if (np.sqrt((xpos-cent)**2 + (ypos-cent)**2)) >= (rad-10):
-        # 1. calculate gradient from point to mid. This will be the 
+    if (np.sqrt((xpos-cent)**2 + (ypos-cent)**2)) >= (rad-20): #-10 due to ball's radius
+        # 1. calculate gradient from point to mid. This will be the
         # norm of contact point
         norm = (ypos - cent)/(xpos - cent)
         # 2. instantaneous gradient of circular boundary at point of contact
@@ -63,25 +64,30 @@ def animate(i):
         # 3. gradient of ball
         grad_ball = ypos/xpos
         # 4. new angle calculation
-        # angle between ball path and circle
-        theta_reflect = np.arctan(abs((grad_ball  - grad)/(1 + grad_ball*grad)))
-        # angle between ball path and x-axis
-        theta_horizon = np.arctan(abs(grad))
+        # incident angle between ball path and circle. This will also be the 
+        # reflected angle between ball path and circle.
+        theta_iBC = theta_fBC = abs(np.arctan(abs((grad_ball  - grad)/(1 + grad_ball*grad))))
+        # incident angle between ball path and x-axis.
+        theta_iBX = abs(np.arctan(abs(grad_ball)))
+        # angle between circle and xaxis
+        theta_CX = abs(np.arctan(abs(grad)))
+        # get ball velocity
         xvel, yvel = functions.get_vel(t, theta, v0, g)
+        # calculate final angle
         if xvel > 0 and xpos > cent:
-            theta = theta_reflect + np.arctan(abs(grad)) + 0 
+            theta = theta_fBC + theta_CX + 0 # 0 radians
         elif xvel < 0 and xpos > cent:
-            if theta_horizon > np.pi:
-                theta = theta_reflect + theta_horizon + np.pi     
-            else:
-                theta = theta_reflect - theta_horizon + np.pi  
+            theta = 2 * np.pi - (np.pi/2 + theta_fBC + (np.pi/2 - theta_CX))
         elif xvel > 0 and xpos < cent:
-            if theta_horizon < np.pi:
-                theta = theta_reflect + theta_horizon + (3/2) * np.pi
-            else:
-                theta = theta_reflect - theta_horizon + (3/2) * np.pi            
+            theta = abs((np.pi/2 - theta_CX) + theta_fBC )
+            if theta > np.pi:
+                theta = np.pi - theta
+            elif theta < np.pi:
+                theta = (3/2) * np.pi + theta
+            elif theta == np.pi:
+                theta = 0
         elif xvel < 0 and xpos < cent:
-            theta = theta_reflect + theta_horizon + (1/2) * np.pi
+            theta = 2 * np.pi - (np.pi + theta_CX + theta_fBC)
         # 5. reset to next(t = 0) for equation of motion. Reset also x0, y0
         t = dt
         x0, y0 = [xpos, ypos]
@@ -108,7 +114,7 @@ anim = animation.FuncAnimation(fig, animate, init_func=init,
 # Save movie
 # =============================================================================
 # path2save = r"/Users/jwt/Documents/Code/Bounce_Game/"
-# anim.save(path2save+'stage4.mp4', fps=30,
+# anim.save(path2save+'stage5.mp4', fps=30,
 #           extra_args=['-vcodec', 'libx264'])
 
 
