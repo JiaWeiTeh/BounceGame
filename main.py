@@ -21,7 +21,8 @@ RADIUS = 340
 AXIS_PADDING = 200
 
 # Ball properties
-BALL_RADIUS = 10
+BALL_MARKER_SIZE = 10       # visual marker size in points
+BALL_COLLISION_RADIUS = 10  # collision offset in data coordinates
 INITIAL_SPEED = 10
 INITIAL_ANGLE = np.deg2rad(0)
 INITIAL_X, INITIAL_Y = CENTER, CENTER
@@ -34,16 +35,6 @@ DT = 0.6
 # Animation
 NUM_FRAMES = 500
 FRAME_INTERVAL_MS = 5
-
-
-# =============================================================================
-# Simulation state
-# =============================================================================
-
-t = 0
-v0 = INITIAL_SPEED
-theta = INITIAL_ANGLE
-x0, y0 = INITIAL_X, INITIAL_Y
 
 
 # =============================================================================
@@ -60,56 +51,67 @@ def setup_figure():
     ax.xaxis.set_ticks([])
     ax.yaxis.set_ticks([])
     physics.draw(ax, RADIUS, CENTER)
-    plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=BALL_RADIUS)
+    plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=BALL_MARKER_SIZE)
     return fig, plot_ball
-
-
-def init(plot_ball):
-    """Set ball to its initial position."""
-    plot_ball.set_data(x0, y0)
-    return plot_ball,
-
-
-def animate(i, plot_ball):
-    """Advance simulation by one frame."""
-    global t, x0, y0, theta, v0
-    t += DT
-    xpos, ypos = physics.get_pos(t, theta, x0, y0, v0, GRAVITY)
-
-    effective_rad = RADIUS - BALL_RADIUS
-    dist = np.sqrt((xpos - CENTER)**2 + (ypos - CENTER)**2)
-
-    if dist >= effective_rad:
-        # Clamp position back onto the boundary surface
-        xpos, ypos = physics.clamp_to_boundary(
-            xpos, ypos, CENTER, RADIUS, BALL_RADIUS
-        )
-        # Reflect velocity off the circular wall
-        xvel, yvel = physics.get_vel(t, theta, v0, GRAVITY)
-        new_vx, new_vy = physics.reflect_velocity(
-            xvel, yvel, xpos, ypos, CENTER, RESTITUTION
-        )
-        # Convert reflected velocity back to speed + angle
-        v0 = np.sqrt(new_vx**2 + new_vy**2)
-        theta = np.arctan2(new_vy, new_vx)
-        # Reset trajectory origin
-        t = DT
-        x0, y0 = xpos, ypos
-        xpos, ypos = physics.get_pos(t, theta, x0, y0, v0, GRAVITY)
-
-    plot_ball.set_data(xpos, ypos)
-    return plot_ball,
 
 
 def main():
     """Run the bounce simulation."""
     fig, plot_ball = setup_figure()
 
+    # Mutable simulation state, captured by the closures below
+    state = {
+        't': 0.0,
+        'v0': INITIAL_SPEED,
+        'theta': INITIAL_ANGLE,
+        'x0': float(INITIAL_X),
+        'y0': float(INITIAL_Y),
+    }
+
+    def init():
+        plot_ball.set_data(state['x0'], state['y0'])
+        return plot_ball,
+
+    def animate(i):
+        state['t'] += DT
+        xpos, ypos = physics.get_pos(
+            state['t'], state['theta'], state['x0'], state['y0'],
+            state['v0'], GRAVITY,
+        )
+
+        effective_rad = RADIUS - BALL_COLLISION_RADIUS
+        dist = np.sqrt((xpos - CENTER)**2 + (ypos - CENTER)**2)
+
+        if dist >= effective_rad:
+            # Clamp position back onto the boundary surface
+            xpos, ypos = physics.clamp_to_boundary(
+                xpos, ypos, CENTER, RADIUS, BALL_COLLISION_RADIUS
+            )
+            # Reflect velocity off the circular wall
+            xvel, yvel = physics.get_vel(
+                state['t'], state['theta'], state['v0'], GRAVITY,
+            )
+            new_vx, new_vy = physics.reflect_velocity(
+                xvel, yvel, xpos, ypos, CENTER, RESTITUTION
+            )
+            # Convert reflected velocity back to speed + angle
+            state['v0'] = np.sqrt(new_vx**2 + new_vy**2)
+            state['theta'] = np.arctan2(new_vy, new_vx)
+            # Reset trajectory origin
+            state['t'] = DT
+            state['x0'], state['y0'] = xpos, ypos
+            xpos, ypos = physics.get_pos(
+                state['t'], state['theta'], state['x0'], state['y0'],
+                state['v0'], GRAVITY,
+            )
+
+        plot_ball.set_data(xpos, ypos)
+        return plot_ball,
+
     _anim = animation.FuncAnimation(
         fig,
         animate,
-        init_func=lambda: init(plot_ball),
-        fargs=(plot_ball,),
+        init_func=init,
         frames=NUM_FRAMES,
         interval=FRAME_INTERVAL_MS,
         blit=True,
