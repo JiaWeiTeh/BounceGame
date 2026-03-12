@@ -50,57 +50,37 @@ def init():
 
 
 def animate(i):
-    global t, x0, y0, theta, v0, g, dt
+    global t, x0, y0, theta, v0
     t += dt
     xpos, ypos = functions.get_pos(t, theta, x0, y0, v0, g)
-    
-    # if ball outisde boundary, reset equation of trajectory with following steps:
-    if (np.sqrt((xpos-cent)**2 + (ypos-cent)**2)) >= (rad-20): #-10 due to ball's radius
-        # 1. calculate gradient from point to mid. This will be the
-        # norm of contact point
-        norm = (ypos - cent)/(xpos - cent)
-        # 2. instantaneous gradient of circular boundary at point of contact
-        grad = -1/norm
-        # 3. gradient of ball
-        grad_ball = ypos/xpos
-        # 4. new angle calculation
-        # incident angle between ball path and circle. This will also be the 
-        # reflected angle between ball path and circle.
-        theta_iBC = theta_fBC = abs(np.arctan(abs((grad_ball  - grad)/(1 + grad_ball*grad))))
-        # incident angle between ball path and x-axis.
-        theta_iBX = abs(np.arctan(abs(grad_ball)))
-        # angle between circle and xaxis
-        theta_CX = abs(np.arctan(abs(grad)))
-        # get ball velocity
+
+    # Effective boundary radius accounting for visual ball size
+    ball_radius = 10
+    effective_rad = rad - ball_radius
+
+    # Check if ball is outside boundary
+    dist = np.sqrt((xpos - cent)**2 + (ypos - cent)**2)
+    if dist >= effective_rad:
+        # 1. Clamp position back onto the boundary surface
+        xpos, ypos = functions.clamp_to_boundary(
+            xpos, ypos, cent, rad, ball_radius
+        )
+        # 2. Get current velocity at moment of collision
         xvel, yvel = functions.get_vel(t, theta, v0, g)
-        # calculate final angle
-        if xvel > 0 and xpos > cent:
-            theta = theta_fBC + theta_CX + 0 # 0 radians
-        elif xvel < 0 and xpos > cent:
-            theta = 2 * np.pi - (np.pi/2 + theta_fBC + (np.pi/2 - theta_CX))
-        elif xvel > 0 and xpos < cent:
-            theta = abs((np.pi/2 - theta_CX) + theta_fBC )
-            if theta > np.pi:
-                theta = np.pi - theta
-            elif theta < np.pi:
-                theta = (3/2) * np.pi + theta
-            elif theta == np.pi:
-                theta = 0
-        elif xvel < 0 and xpos < cent:
-            theta = 2 * np.pi - (np.pi + theta_CX + theta_fBC)
-        # 5. reset to next(t = 0) for equation of motion. Reset also x0, y0
+        # 3. Reflect velocity off the circular wall (restitution on normal only)
+        new_vx, new_vy = functions.reflect_velocity(
+            xvel, yvel, xpos, ypos, cent, e
+        )
+        # 4. Convert reflected velocity back to speed + angle for equations of motion
+        v0 = np.sqrt(new_vx**2 + new_vy**2)
+        theta = np.arctan2(new_vy, new_vx)
+        # 5. Reset time and origin for the next trajectory segment
         t = dt
-        x0, y0 = [xpos, ypos]
-        # 6. account for energy loss
-        v0 *= e
-        # 7. recalculate and plot
+        x0, y0 = xpos, ypos
+        # 6. Recalculate position for this frame
         xpos, ypos = functions.get_pos(t, theta, x0, y0, v0, g)
-        plot_ball.set_data(xpos,ypos)
-        
-        return plot_ball,
-    
-    plot_ball.set_data(xpos,ypos)
-    
+
+    plot_ball.set_data(xpos, ypos)
     return plot_ball,
 
 anim = animation.FuncAnimation(fig, animate, init_func=init,
