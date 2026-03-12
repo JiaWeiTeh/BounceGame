@@ -30,6 +30,8 @@ INITIAL_X, INITIAL_Y = CENTER, CENTER
 # Physics
 GRAVITY = 0.3
 RESTITUTION = 0.9
+FRICTION = 0.05           # tangential energy loss on wall collision (0–1)
+AIR_DRAG = 0.005          # air resistance coefficient (0–1)
 DT = 0.6
 
 # Animation
@@ -74,6 +76,22 @@ def main():
 
     def animate(i):
         state['t'] += DT
+
+        # Apply air drag: get current velocity, reduce it, reset trajectory
+        if AIR_DRAG > 0:
+            xvel, yvel = physics.get_vel(
+                state['t'], state['theta'], state['v0'], GRAVITY,
+            )
+            xpos, ypos = physics.get_pos(
+                state['t'], state['theta'], state['x0'], state['y0'],
+                state['v0'], GRAVITY,
+            )
+            drag_vx, drag_vy = physics.apply_drag(xvel, yvel, AIR_DRAG, DT)
+            state['v0'] = np.sqrt(drag_vx**2 + drag_vy**2)
+            state['theta'] = np.arctan2(drag_vy, drag_vx)
+            state['x0'], state['y0'] = xpos, ypos
+            state['t'] = DT
+
         xpos, ypos = physics.get_pos(
             state['t'], state['theta'], state['x0'], state['y0'],
             state['v0'], GRAVITY,
@@ -87,12 +105,12 @@ def main():
             xpos, ypos = physics.clamp_to_boundary(
                 xpos, ypos, CENTER, RADIUS, BALL_COLLISION_RADIUS
             )
-            # Reflect velocity off the circular wall
+            # Reflect velocity off the circular wall (with friction)
             xvel, yvel = physics.get_vel(
                 state['t'], state['theta'], state['v0'], GRAVITY,
             )
             new_vx, new_vy = physics.reflect_velocity(
-                xvel, yvel, xpos, ypos, CENTER, RESTITUTION
+                xvel, yvel, xpos, ypos, CENTER, RESTITUTION, FRICTION
             )
             # Convert reflected velocity back to speed + angle
             state['v0'] = np.sqrt(new_vx**2 + new_vy**2)

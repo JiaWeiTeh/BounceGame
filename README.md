@@ -7,6 +7,8 @@ A 2D physics simulation of a ball bouncing inside a circular boundary, built wit
 - Projectile motion with configurable gravity
 - Collision detection and vector-based reflection off a circular wall
 - Energy loss via coefficient of restitution (applied to normal velocity component)
+- Collision friction (tangential energy loss on wall contact)
+- Air drag (velocity-dependent resistance during flight)
 - Real-time animation using Matplotlib's `FuncAnimation`
 
 ## Requirements
@@ -40,9 +42,11 @@ All simulation parameters are defined as constants at the top of `main.py`:
 | `BALL_MARKER_SIZE` | 10 | Visual size of the ball (marker size in points) |
 | `BALL_COLLISION_RADIUS` | 10 | Collision offset from boundary (data coordinates) |
 | `INITIAL_SPEED` | 10 | Launch speed |
-| `INITIAL_ANGLE` | 0 | Launch angle in radians |
-| `GRAVITY` | 0.5 | Gravitational acceleration |
-| `RESTITUTION` | 0.99 | Coefficient of restitution (0–1) |
+| `INITIAL_ANGLE` | 20° | Launch angle (set via `np.deg2rad`) |
+| `GRAVITY` | 0.3 | Gravitational acceleration |
+| `RESTITUTION` | 0.9 | Coefficient of restitution for normal component (0–1) |
+| `FRICTION` | 0.05 | Tangential energy loss on wall collision (0–1) |
+| `AIR_DRAG` | 0.005 | Air resistance coefficient (0–1) |
 | `DT` | 0.6 | Simulation timestep per frame |
 
 ## Running Tests

@@ -154,3 +154,72 @@ class TestReflectVelocity:
         vx, vy = physics.reflect_velocity(5, 3, 400, 400, 400, 1.0)
         assert vx == pytest.approx(5)
         assert vy == pytest.approx(3)
+
+    def test_friction_reduces_tangential(self):
+        """Friction reduces tangential component on collision."""
+        # Ball at (740, 400) moving right and up; normal is x, tangential is y
+        vx, vy = physics.reflect_velocity(10, 8, 740, 400, 400, 1.0, friction=0.5)
+        assert vx == pytest.approx(-10)  # normal fully reflected
+        assert vy == pytest.approx(4)    # tangential halved
+
+    def test_friction_zero_is_default(self):
+        """With friction=0, tangential is fully preserved (backward compat)."""
+        vx, vy = physics.reflect_velocity(10, 8, 740, 400, 400, 1.0, friction=0.0)
+        assert vx == pytest.approx(-10)
+        assert vy == pytest.approx(8)
+
+    def test_full_friction_zeroes_tangential(self):
+        """With friction=1, all tangential speed is lost."""
+        vx, vy = physics.reflect_velocity(10, 8, 740, 400, 400, 1.0, friction=1.0)
+        assert vx == pytest.approx(-10)
+        assert vy == pytest.approx(0)
+
+    def test_friction_with_restitution(self):
+        """Friction and restitution apply independently to their components."""
+        vx, vy = physics.reflect_velocity(10, 6, 740, 400, 400, 0.5, friction=0.5)
+        assert vx == pytest.approx(-5)  # normal * restitution
+        assert vy == pytest.approx(3)   # tangential * (1 - friction)
+
+
+# ---- apply_drag ----
+
+class TestApplyDrag:
+    def test_no_drag(self):
+        """With drag=0, velocity is unchanged."""
+        vx, vy = physics.apply_drag(10, 5, 0, 1.0)
+        assert vx == pytest.approx(10)
+        assert vy == pytest.approx(5)
+
+    def test_drag_reduces_speed(self):
+        """Drag reduces both velocity components."""
+        vx, vy = physics.apply_drag(10, 10, 0.1, 1.0)
+        expected = 10 * (1 - 0.1) ** 1.0
+        assert vx == pytest.approx(expected)
+        assert vy == pytest.approx(expected)
+
+    def test_drag_scales_with_dt(self):
+        """Larger dt applies more drag."""
+        vx1, _ = physics.apply_drag(10, 0, 0.1, 1.0)
+        vx2, _ = physics.apply_drag(10, 0, 0.1, 2.0)
+        assert vx2 < vx1  # more time = more drag
+
+    def test_drag_is_framerate_independent(self):
+        """Two half-steps of drag equal one full step."""
+        vx_full, vy_full = physics.apply_drag(10, 10, 0.1, 2.0)
+        vx_half, vy_half = physics.apply_drag(10, 10, 0.1, 1.0)
+        vx_two, vy_two = physics.apply_drag(vx_half, vy_half, 0.1, 1.0)
+        assert vx_two == pytest.approx(vx_full)
+        assert vy_two == pytest.approx(vy_full)
+
+    def test_drag_preserves_direction(self):
+        """Drag scales magnitude but doesn't change direction."""
+        vx, vy = physics.apply_drag(-7, 3, 0.2, 1.5)
+        factor = (1 - 0.2) ** 1.5
+        assert vx == pytest.approx(-7 * factor)
+        assert vy == pytest.approx(3 * factor)
+
+    def test_negative_drag_treated_as_zero(self):
+        """Negative drag coefficient is treated as no drag."""
+        vx, vy = physics.apply_drag(10, 5, -0.5, 1.0)
+        assert vx == pytest.approx(10)
+        assert vy == pytest.approx(5)

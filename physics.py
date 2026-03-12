@@ -49,12 +49,22 @@ def clamp_to_boundary(xpos, ypos, center, radius, ball_radius):
     return center + dx * scale, center + dy * scale
 
 
-def reflect_velocity(xvel, yvel, xpos, ypos, center, restitution):
+def reflect_velocity(xvel, yvel, xpos, ypos, center, restitution,
+                     friction=0.0):
     """Reflect velocity off the circular boundary using vector math.
 
     Uses the inward-pointing normal of the circle at the contact point.
-    The coefficient of restitution is applied only to the normal component
-    of velocity, preserving tangential speed.
+    The coefficient of restitution is applied only to the normal component,
+    and friction is applied only to the tangential component.
+
+    Args:
+        xvel, yvel: Incoming velocity components.
+        xpos, ypos: Ball position at point of contact.
+        center: Center coordinate of the circular boundary.
+        restitution: Coefficient of restitution (0–1) for the normal component.
+        friction: Coefficient of friction (0–1) for the tangential component.
+            0 = no friction (tangential speed fully preserved),
+            1 = full friction (tangential speed zeroed on contact).
 
     Returns (new_vx, new_vy).
     """
@@ -77,8 +87,28 @@ def reflect_velocity(xvel, yvel, xpos, ypos, center, restitution):
     vt_x = xvel - vn_x
     vt_y = yvel - vn_y
 
-    # Reflect: reverse normal component, apply restitution only to normal
-    new_vx = vt_x - restitution * vn_x
-    new_vy = vt_y - restitution * vn_y
+    # Reflect normal, apply restitution to normal and friction to tangential
+    new_vx = (1 - friction) * vt_x - restitution * vn_x
+    new_vy = (1 - friction) * vt_y - restitution * vn_y
 
     return new_vx, new_vy
+
+
+def apply_drag(vx, vy, drag, dt):
+    """Apply air drag to velocity components over a timestep.
+
+    Uses an exponential decay model: v_new = v * (1 - drag)^dt.
+    This is frame-rate independent — the same total drag is applied
+    regardless of how dt is subdivided.
+
+    Args:
+        vx, vy: Velocity components.
+        drag: Drag coefficient (0–1). 0 = no drag, higher = more drag.
+        dt: Timestep duration.
+
+    Returns (new_vx, new_vy).
+    """
+    if drag <= 0:
+        return vx, vy
+    factor = (1 - drag) ** dt
+    return vx * factor, vy * factor
