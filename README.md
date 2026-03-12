@@ -37,7 +37,8 @@ All simulation parameters are defined as constants at the top of `main.py`:
 |---|---|---|
 | `BOARD_SIZE` | 800 | Size of the coordinate space |
 | `RADIUS` | 340 | Radius of the circular boundary |
-| `BALL_RADIUS` | 10 | Visual size of the ball (marker size) |
+| `BALL_MARKER_SIZE` | 10 | Visual size of the ball (marker size in points) |
+| `BALL_COLLISION_RADIUS` | 10 | Collision offset from boundary (data coordinates) |
 | `INITIAL_SPEED` | 10 | Launch speed |
 | `INITIAL_ANGLE` | 0 | Launch angle in radians |
 | `GRAVITY` | 0.5 | Gravitational acceleration |
