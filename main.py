@@ -24,12 +24,12 @@ AXIS_PADDING = 200
 BALL_MARKER_SIZE = 10       # visual marker size in points
 BALL_COLLISION_RADIUS = 10  # collision offset in data coordinates
 INITIAL_SPEED = 10
-INITIAL_ANGLE = np.deg2rad(0)
+INITIAL_ANGLE = np.deg2rad(20)
 INITIAL_X, INITIAL_Y = CENTER, CENTER
 
 # Physics
-GRAVITY = 0.5
-RESTITUTION = 0.99
+GRAVITY = 0.3
+RESTITUTION = 0.9
 DT = 0.6
 
 # Animation
