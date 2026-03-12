@@ -7,12 +7,12 @@ Provides drawing, kinematics, and collision-reflection utilities.
 import numpy as np
 
 
-def draw(ax, rad, cent):
+def draw(ax, radius, center):
     """Draw circular boundary on the given axes."""
-    angle = np.linspace(0, 2*np.pi, 200)
+    angle = np.linspace(0, 2 * np.pi, 200)
 
-    x = rad*np.cos(angle) + cent
-    y = rad*np.sin(angle) + cent
+    x = radius * np.cos(angle) + center
+    y = radius * np.sin(angle) + center
 
     ax.plot(x, y, c='green')
 
@@ -33,23 +33,23 @@ def get_pos(t, theta, x0, y0, vel, g):
     return xpos, ypos
 
 
-def clamp_to_boundary(xpos, ypos, cent, rad, ball_radius):
+def clamp_to_boundary(xpos, ypos, center, radius, ball_radius):
     """Project a position back onto the circle boundary (minus ball radius).
 
     Returns the clamped (x, y) on the inner boundary surface.
     """
-    dx = xpos - cent
-    dy = ypos - cent
+    dx = xpos - center
+    dy = ypos - center
     dist = np.sqrt(dx**2 + dy**2)
     if dist == 0:
         # Degenerate: ball exactly at center, push in arbitrary direction
-        return cent + (rad - ball_radius), cent
-    max_dist = rad - ball_radius
+        return center + (radius - ball_radius), center
+    max_dist = radius - ball_radius
     scale = max_dist / dist
-    return cent + dx * scale, cent + dy * scale
+    return center + dx * scale, center + dy * scale
 
 
-def reflect_velocity(xvel, yvel, xpos, ypos, cent, restitution):
+def reflect_velocity(xvel, yvel, xpos, ypos, center, restitution):
     """Reflect velocity off the circular boundary using vector math.
 
     Uses the inward-pointing normal of the circle at the contact point.
@@ -59,8 +59,8 @@ def reflect_velocity(xvel, yvel, xpos, ypos, cent, restitution):
     Returns (new_vx, new_vy).
     """
     # Normal vector pointing inward (from contact point toward center)
-    nx = cent - xpos
-    ny = cent - ypos
+    nx = center - xpos
+    ny = center - ypos
     n_mag = np.sqrt(nx**2 + ny**2)
     if n_mag == 0:
         # Degenerate case: ball at exact center, return velocity unchanged
