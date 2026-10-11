@@ -23,5 +23,7 @@ env/
 .DS_Store
 Thumbs.db
 
-# Output
+# Output (the demo GIF in assets/ is kept)
 *.mp4
+*.gif
+!assets/*.gif

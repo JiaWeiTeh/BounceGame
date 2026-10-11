@@ -5,6 +5,8 @@ The ball follows projectile motion under gravity. It loses energy on each
 bounce through restitution and wall friction, and slows in flight from air
 drag.
 
+![Ball bouncing inside a circular wall](assets/bounce.gif)
+
 ## Install
 
 You need Python 3.10 or newer.
@@ -27,6 +29,18 @@ python main.py
 ```
 
 A window opens with the animation. Close it to stop.
+
+## Save a video
+
+```bash
+python main.py --save bounce.gif
+python main.py --save bounce.mp4 --seconds 20
+```
+
+GIF works out of the box. MP4 needs [ffmpeg](https://ffmpeg.org), for
+example `brew install ffmpeg` or `conda install -c conda-forge ffmpeg`.
+Clips last 12 seconds unless you pass `--seconds`. The demo above was
+made with `python main.py --save assets/bounce.gif`.
 
 ## Settings
 
@@ -52,7 +66,8 @@ time.
 
 - `main.py` sets up the figure, holds the settings and runs the animation.
 - `physics.py` holds the motion, bounce and drag calculations.
-- `test_physics.py` holds the unit tests.
+- `test_physics.py` and `test_main.py` hold the tests.
+- `assets/bounce.gif` is the demo animation.
 
 ## Test
 
