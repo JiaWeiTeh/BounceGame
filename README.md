@@ -1,6 +1,9 @@
 # BounceGame
 
-A ball bouncing inside a circular wall, animated with Python and Matplotlib.
+A small hobby project: a ball bouncing inside a circular wall, animated
+with Python and Matplotlib. I wrote it as a mini exercise to get to know
+animation and object-oriented Python better.
+
 The ball follows projectile motion under gravity. It loses energy on each
 bounce through restitution and wall friction, and slows in flight from air
 drag.
