@@ -4,15 +4,17 @@
 import numpy as np
 
 
-def draw(ax, rad, cent, sides=0):
+def draw(ax, rad, cent, sides=0, tilt=0):
     """
-    Draw the boundary on ax: a circle, or a polygon with that many sides.
+    Draw the boundary on ax: a circle, or a polygon with that many sides,
+    turned by an angle tilt (in radians).
     """
     if sides == 0:
         angle = np.linspace(0, 2*np.pi, 200)
     else:
         # corners, going all the way round back to the first one
-        angle = -np.pi/2 - np.pi/sides + 2*np.pi*np.arange(sides + 1)/sides
+        angle = (-np.pi/2 - np.pi/sides + tilt
+                 + 2*np.pi*np.arange(sides + 1)/sides)
 
     x = rad*np.cos(angle) + cent
     y = rad*np.sin(angle) + cent
@@ -42,7 +44,7 @@ def drag(xvel, yvel, k, dt):
     return xvel * factor, yvel * factor
 
 
-def walls(xpos, ypos, cent, rad, sides):
+def walls(xpos, ypos, cent, rad, sides, tilt=0):
     """
     Return the walls of the boundary as (nx, ny, a): the outward norm of each
     wall and its distance a from the centre.
@@ -56,9 +58,10 @@ def walls(xpos, ypos, cent, rad, sides):
             # ball exactly in the middle, nowhere near the wall
             return []
         return [(dx/dist, dy/dist, rad)]
-    # polygon with its corners on the circle of radius rad, flat side at the
-    # bottom. every side faces outwards at its own angle
-    angle = -np.pi/2 + 2*np.pi*np.arange(sides)/sides
+    # polygon with its corners on the circle of radius rad, turned by tilt.
+    # with tilt = 0 there is a flat side at the bottom. every side faces
+    # outwards at its own angle
+    angle = -np.pi/2 + tilt + 2*np.pi*np.arange(sides)/sides
     a = rad * np.cos(np.pi/sides)
 
     return [(np.cos(phi), np.sin(phi), a) for phi in angle]
@@ -83,7 +86,8 @@ def reflect(xvel, yvel, nx, ny, e, mu):
     return xvel, yvel
 
 
-def bounce(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides, e, mu):
+def bounce(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides, e, mu,
+           tilt=0):
     """
     If the ball touches or goes past a wall, put it back and bounce it off.
     """
@@ -91,7 +95,7 @@ def bounce(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides, e, mu):
     # wall can push it past the other one, so go round the walls a few times
     for i in range(100):
         inside = True
-        for nx, ny, a in walls(xpos, ypos, cent, rad, sides):
+        for nx, ny, a in walls(xpos, ypos, cent, rad, sides, tilt):
             # how far the ball is past this wall
             past = (xpos - cent) * nx + (ypos - cent) * ny - (a - ball_rad)
             if past > 1e-9:
@@ -106,13 +110,13 @@ def bounce(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides, e, mu):
 
 
 def step(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides, g, dt, e, mu,
-         k):
+         k, tilt=0):
     """
     Move the ball by one timestep dt, and bounce it if it hits the boundary.
     """
     xvel, yvel = drag(xvel, yvel, k, dt)
     xpos, ypos, xvel, yvel = move(xpos, ypos, xvel, yvel, g, dt)
     xpos, ypos, xvel, yvel = bounce(xpos, ypos, xvel, yvel,
-                                    cent, rad, ball_rad, sides, e, mu)
+                                    cent, rad, ball_rad, sides, e, mu, tilt)
 
     return xpos, ypos, xvel, yvel

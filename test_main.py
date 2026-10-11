@@ -38,3 +38,15 @@ def test_save_other_shape(tmp_path):
 def test_wrong_shape():
     with pytest.raises(SystemExit):
         main.main(["--shape", "star"])
+
+
+def test_random_tilt_is_printed(tmp_path, capsys):
+    main.main(["--save", str(tmp_path / "t.gif"), "--seconds", "0.1",
+               "--shape", "triangle"])
+    assert "use --tilt" in capsys.readouterr().out
+
+
+def test_fixed_tilt_is_not_printed(tmp_path, capsys):
+    main.main(["--save", str(tmp_path / "t.gif"), "--seconds", "0.1",
+               "--shape", "triangle", "--tilt", "30"])
+    assert "use --tilt" not in capsys.readouterr().out

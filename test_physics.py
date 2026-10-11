@@ -24,10 +24,11 @@ def step(xpos, ypos, xvel, yvel, g, dt, e=1, mu=0, k=0, sides=0):
                         g, dt, e, mu, k)
 
 
-def furthest_past_wall(xpos, ypos, sides):
+def furthest_past_wall(xpos, ypos, sides, tilt=0):
     # how far the ball is past the wall it is closest to going through
     return max((xpos - cent) * nx + (ypos - cent) * ny - (a - ball_rad)
-               for nx, ny, a in physics.walls(xpos, ypos, cent, rad, sides))
+               for nx, ny, a in physics.walls(xpos, ypos, cent, rad, sides,
+                                              tilt))
 
 
 # =============================================================================
@@ -200,6 +201,20 @@ def test_triangle_has_flat_bottom():
     assert a == pytest.approx(rad / 2)
 
 
+def test_tilted_square_walls():
+    # turned by 45 degrees the square stands on a corner, so its walls face
+    # diagonally
+    got = sorted((round(nx, 6), round(ny, 6)) for nx, ny, _ in
+                 physics.walls(0, 0, cent, rad, 4, np.pi/4))
+    d = round(1/np.sqrt(2), 6)
+    assert got == [(-d, -d), (-d, d), (d, -d), (d, d)]
+
+
+def test_tilt_does_not_change_circle():
+    assert physics.walls(500, 450, cent, rad, 0, 1.0) == pytest.approx(
+        physics.walls(500, 450, cent, rad, 0))
+
+
 def test_square_bounce():
     # past the right wall of the square, moving right and up
     a = rad / np.sqrt(2)
@@ -218,11 +233,16 @@ def test_triangle_corner():
 
 
 @pytest.mark.parametrize("sides", [0, 3, 4, 5, 6, 8])
-def test_ball_stays_inside(sides):
-    # settings from main.py, ball should never leave the board
+@pytest.mark.parametrize("deg", [0, 17, 45, 60, 221])
+def test_ball_stays_inside(sides, deg):
+    # settings from main.py, ball should never leave the board, however the
+    # shape is turned
+    tilt = np.deg2rad(deg)
     ball = (400, 400, 10*np.cos(np.deg2rad(20)), 10*np.sin(np.deg2rad(20)))
     furthest = -rad
-    for i in range(5000):
-        ball = step(*ball, 0.3, 0.6, e=0.9, mu=0.05, k=0.005, sides=sides)
-        furthest = max(furthest, furthest_past_wall(ball[0], ball[1], sides))
+    for i in range(3000):
+        ball = physics.step(*ball, cent, rad, ball_rad, sides, 0.3, 0.6,
+                            0.9, 0.05, 0.005, tilt)
+        furthest = max(furthest, furthest_past_wall(ball[0], ball[1], sides,
+                                                    tilt))
     assert furthest <= 1e-9

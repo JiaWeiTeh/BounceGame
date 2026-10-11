@@ -63,14 +63,16 @@ python main.py --shape triangle
 ```
 
 The shapes are `circle`, `triangle`, `square`, `pentagon`, `hexagon` and
-`octagon`.
+`octagon`. Each run turns the shape to a random angle, so the ball does not
+always land on a flat side at the bottom. The angle is printed, and `--tilt`
+sets it in degrees. For example, `--tilt 0` puts a flat side at the bottom.
 
 ## Save a video
 
 ```bash
 python main.py --save bounce.gif
 python main.py --save bounce.mp4 --seconds 20
-python main.py --save square.gif --shape square
+python main.py --save square.gif --shape square --tilt 45
 ```
 
 GIF works out of the box. MP4 needs [ffmpeg](https://ffmpeg.org), for
@@ -85,6 +87,7 @@ Edit the values at the top of `main.py`. The main ones are:
 | Name | Default | Meaning |
 |---|---|---|
 | `shape` | `'circle'` | Shape of the boundary, also set with `--shape` |
+| `tilt` | `None` | Angle to turn the shape by, in degrees. `None` picks a random angle each run |
 | `rad` | 340 | Radius of the circle, or distance from the centre to the corners of other shapes |
 | `ball_rad` | 10 | Ball radius used for collisions |
 | `ball_ms` | 10 | Drawn ball size, in points |

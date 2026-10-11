@@ -23,6 +23,9 @@ boardx, boardy = [800, 800]
 shape = 'circle'
 sides = {'circle': 0, 'triangle': 3, 'square': 4, 'pentagon': 5,
          'hexagon': 6, 'octagon': 8}
+# angle to turn the shape by, in degrees. None picks a random one each time,
+# so the ball doesn't always land on a flat side at the bottom
+tilt = None
 # center of board, and radius of circle (or distance to the corners of the
 # other shapes)
 cent = 400
@@ -84,6 +87,10 @@ def get_args(argv=None):
         '--shape', choices=sides, default=shape,
         help="shape of the boundary (default: %(default)s)",
     )
+    parser.add_argument(
+        '--tilt', type=float, default=tilt, metavar='DEG',
+        help="angle to turn the shape by, in degrees (default: random)",
+    )
     return parser.parse_args(argv)
 
 
@@ -125,7 +132,14 @@ def main(argv=None):
     ax.xaxis.set_ticks([])
     ax.yaxis.set_ticks([])
     nsides = sides[args.shape]
-    physics.draw(ax, rad, cent, nsides)
+    deg = args.tilt
+    if deg is None:
+        deg = np.random.randint(360)
+        if nsides > 0:
+            print(f"{args.shape} turned by {deg} degrees, "
+                  f"use --tilt {deg} to get the same one again")
+    turn = np.deg2rad(deg)
+    physics.draw(ax, rad, cent, nsides, turn)
     # plot ball
     plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=ball_ms)
     # launch ball from (x0, y0) with speed v0 at angle theta
@@ -141,7 +155,7 @@ def main(argv=None):
         for _ in range(steps):
             xpos, ypos, xvel, yvel = physics.step(xpos, ypos, xvel, yvel,
                                                   cent, rad, ball_rad, nsides,
-                                                  g, dt, e, mu, k)
+                                                  g, dt, e, mu, k, turn)
         plot_ball.set_data([xpos], [ypos])
         return plot_ball,
 
