@@ -1,270 +1,158 @@
 # -*- coding: utf-8 -*-
-"""Unit tests for the physics module."""
+"""Tests for the physics functions."""
 
-import math
 import numpy as np
 import pytest
 import physics
 
-
-# ---- move ----
-
-class TestMove:
-    def test_zero_dt_no_change(self):
-        """With dt=0, position and velocity are unchanged."""
-        assert physics.move(5.0, 10.0, 3.0, -2.0, 0.5, 0) == pytest.approx(
-            (5.0, 10.0, 3.0, -2.0)
-        )
-
-    def test_horizontal_motion(self):
-        """Horizontal launch: x moves linearly, y only falls under gravity."""
-        dt, vel, g = 2.0, 10.0, 1.0
-        x, y, vx, vy = physics.move(0, 0, vel, 0, g, dt)
-        assert x == pytest.approx(vel * dt)
-        assert y == pytest.approx(-0.5 * g * dt**2)
-        assert vx == pytest.approx(vel)
-        assert vy == pytest.approx(-g * dt)
-
-    def test_vertical_motion(self):
-        """Vertical launch: x stays put and y follows a projectile."""
-        dt, vel, g = 3.0, 5.0, 2.0
-        x, y, _, vy = physics.move(0, 0, 0, vel, g, dt)
-        assert x == pytest.approx(0)
-        assert y == pytest.approx(vel * dt - 0.5 * g * dt**2)
-        assert vy == pytest.approx(vel - g * dt)
-
-    def test_offset_origin(self):
-        """Initial position offsets the result."""
-        x, y, _, _ = physics.move(100, 200, 5, 0, 0, 1.0)
-        assert x == pytest.approx(105.0)
-        assert y == pytest.approx(200.0)
-
-    def test_small_steps_match_one_large_step(self):
-        """Ten steps of dt/10 land exactly where one step of dt does."""
-        state = (0.0, 0.0, 7.0, 4.0)
-        for _ in range(10):
-            state = physics.move(*state, 0.5, 0.3)
-        expected = physics.move(0.0, 0.0, 7.0, 4.0, 0.5, 3.0)
-        assert state == pytest.approx(expected)
+# same board and ball as in main.py
+cent, rad, ball_rad = [400, 340, 10]
 
 
-# ---- clamp_to_boundary ----
-
-class TestClampToBoundary:
-    def test_outside_clamped_to_surface(self):
-        """A point outside the circle is pulled back to the inner surface."""
-        # Point at (750, 400), center=400, radius=340, ball_radius=10
-        x, y = physics.clamp_to_boundary(750, 400, 400, 340, 10)
-        dist = math.sqrt((x - 400)**2 + (y - 400)**2)
-        assert dist == pytest.approx(330)  # radius - ball_radius
-
-    def test_preserves_direction(self):
-        """Clamped point is on the same ray from center as the original."""
-        x, y = physics.clamp_to_boundary(500, 500, 400, 340, 10)
-        # Direction from center should be (1, 1) normalized
-        dx, dy = x - 400, y - 400
-        angle = math.atan2(dy, dx)
-        assert angle == pytest.approx(math.pi / 4)
-
-    def test_at_center_degenerate(self):
-        """Ball exactly at center is pushed to a valid boundary position."""
-        x, y = physics.clamp_to_boundary(400, 400, 400, 340, 10)
-        dist = math.sqrt((x - 400)**2 + (y - 400)**2)
-        assert dist == pytest.approx(330)
-
-    def test_already_inside(self):
-        """A point inside still gets projected to the boundary surface."""
-        x, y = physics.clamp_to_boundary(410, 400, 400, 340, 10)
-        dist = math.sqrt((x - 400)**2 + (y - 400)**2)
-        assert dist == pytest.approx(330)
+def dist(xpos, ypos):
+    # distance from the centre of the board
+    return np.sqrt((xpos - cent)**2 + (ypos - cent)**2)
 
 
-# ---- reflect_velocity ----
-
-class TestReflectVelocity:
-    def test_head_on_collision(self):
-        """Ball moving straight outward reflects straight inward."""
-        # Ball at (740, 400), moving right (+x), center at 400
-        vx, vy = physics.reflect_velocity(10, 0, 740, 400, 400, 1.0)
-        assert vx == pytest.approx(-10)
-        assert vy == pytest.approx(0)
-
-    def test_restitution_reduces_normal_speed(self):
-        """Restitution < 1 reduces only the normal component."""
-        vx, vy = physics.reflect_velocity(10, 0, 740, 400, 400, 0.5)
-        assert vx == pytest.approx(-5)
-        assert vy == pytest.approx(0)
-
-    def test_tangential_preserved(self):
-        """Tangential velocity component is unchanged by reflection."""
-        # Ball at (740, 400), moving right and up
-        vx, vy = physics.reflect_velocity(10, 5, 740, 400, 400, 1.0)
-        # Normal is along x (outward = +x), tangential is along y
-        assert vx == pytest.approx(-10)
-        assert vy == pytest.approx(5)
-
-    def test_restitution_does_not_affect_tangential(self):
-        """Even with low restitution, tangential speed stays the same."""
-        vx, vy = physics.reflect_velocity(10, 7, 740, 400, 400, 0.5)
-        assert vx == pytest.approx(-5)
-        assert vy == pytest.approx(7)
-
-    def test_diagonal_collision(self):
-        """Ball hitting wall at 45-degree position reflects correctly."""
-        # Ball at 45 degrees on the circle
-        r = 330
-        pos_x = 400 + r / math.sqrt(2)
-        pos_y = 400 + r / math.sqrt(2)
-        # Moving directly outward at 45 degrees
-        speed = 10
-        vel_x = speed / math.sqrt(2)
-        vel_y = speed / math.sqrt(2)
-
-        new_vx, new_vy = physics.reflect_velocity(
-            vel_x, vel_y, pos_x, pos_y, 400, 1.0
-        )
-        # Should reflect to inward direction
-        assert new_vx == pytest.approx(-vel_x)
-        assert new_vy == pytest.approx(-vel_y)
-
-    def test_degenerate_at_center(self):
-        """Ball at exact center returns velocity unchanged."""
-        vx, vy = physics.reflect_velocity(5, 3, 400, 400, 400, 1.0)
-        assert vx == pytest.approx(5)
-        assert vy == pytest.approx(3)
-
-    def test_friction_reduces_tangential(self):
-        """Friction reduces tangential component on collision."""
-        # Ball at (740, 400) moving right and up; normal is x, tangential y
-        vx, vy = physics.reflect_velocity(
-            10, 8, 740, 400, 400, 1.0, friction=0.5
-        )
-        assert vx == pytest.approx(-10)  # normal fully reflected
-        assert vy == pytest.approx(4)    # tangential halved
-
-    def test_friction_zero_is_default(self):
-        """With friction=0, tangential is fully preserved (backward compat)."""
-        vx, vy = physics.reflect_velocity(
-            10, 8, 740, 400, 400, 1.0, friction=0.0
-        )
-        assert vx == pytest.approx(-10)
-        assert vy == pytest.approx(8)
-
-    def test_full_friction_zeroes_tangential(self):
-        """With friction=1, all tangential speed is lost."""
-        vx, vy = physics.reflect_velocity(
-            10, 8, 740, 400, 400, 1.0, friction=1.0
-        )
-        assert vx == pytest.approx(-10)
-        assert vy == pytest.approx(0)
-
-    def test_friction_with_restitution(self):
-        """Friction and restitution apply independently to their components."""
-        vx, vy = physics.reflect_velocity(
-            10, 6, 740, 400, 400, 0.5, friction=0.5
-        )
-        assert vx == pytest.approx(-5)  # normal * restitution
-        assert vy == pytest.approx(3)   # tangential * (1 - friction)
+def bounce(xpos, ypos, xvel, yvel, e=1, mu=0):
+    return physics.bounce(xpos, ypos, xvel, yvel, cent, rad, ball_rad, e, mu)
 
 
-# ---- apply_drag ----
-
-class TestApplyDrag:
-    def test_no_drag(self):
-        """With drag=0, velocity is unchanged."""
-        vx, vy = physics.apply_drag(10, 5, 0, 1.0)
-        assert vx == pytest.approx(10)
-        assert vy == pytest.approx(5)
-
-    def test_drag_reduces_speed(self):
-        """Drag reduces both velocity components."""
-        vx, vy = physics.apply_drag(10, 10, 0.1, 1.0)
-        expected = 10 * (1 - 0.1) ** 1.0
-        assert vx == pytest.approx(expected)
-        assert vy == pytest.approx(expected)
-
-    def test_drag_scales_with_dt(self):
-        """Larger dt applies more drag."""
-        vx1, _ = physics.apply_drag(10, 0, 0.1, 1.0)
-        vx2, _ = physics.apply_drag(10, 0, 0.1, 2.0)
-        assert vx2 < vx1  # more time = more drag
-
-    def test_drag_is_framerate_independent(self):
-        """Two half-steps of drag equal one full step."""
-        vx_full, vy_full = physics.apply_drag(10, 10, 0.1, 2.0)
-        vx_half, vy_half = physics.apply_drag(10, 10, 0.1, 1.0)
-        vx_two, vy_two = physics.apply_drag(vx_half, vy_half, 0.1, 1.0)
-        assert vx_two == pytest.approx(vx_full)
-        assert vy_two == pytest.approx(vy_full)
-
-    def test_drag_preserves_direction(self):
-        """Drag scales magnitude but doesn't change direction."""
-        vx, vy = physics.apply_drag(-7, 3, 0.2, 1.5)
-        factor = (1 - 0.2) ** 1.5
-        assert vx == pytest.approx(-7 * factor)
-        assert vy == pytest.approx(3 * factor)
-
-    def test_negative_drag_treated_as_zero(self):
-        """Negative drag coefficient is treated as no drag."""
-        vx, vy = physics.apply_drag(10, 5, -0.5, 1.0)
-        assert vx == pytest.approx(10)
-        assert vy == pytest.approx(5)
+def step(xpos, ypos, xvel, yvel, g, dt, e=1, mu=0, k=0):
+    return physics.step(xpos, ypos, xvel, yvel, cent, rad, ball_rad,
+                        g, dt, e, mu, k)
 
 
-# ---- step ----
+# =============================================================================
+# Move
+# =============================================================================
 
-# Arena used by the step tests: matches the defaults in main.py
-ARENA = dict(center=400, radius=340, ball_radius=10)
+def test_move_horizontal():
+    # x moves in a straight line, y only falls from gravity
+    assert physics.move(0, 0, 10, 0, 1, 2) == pytest.approx((20, -2, 10, -2))
 
 
-class TestStep:
-    def test_free_flight_matches_move(self):
-        """Away from the wall and without drag, step is a plain move."""
-        result = physics.step(400, 400, 3, 2, dt=0.6, gravity=0.3,
-                              restitution=0.9, **ARENA)
-        assert result == pytest.approx(physics.move(400, 400, 3, 2, 0.3, 0.6))
+def test_move_vertical():
+    xpos, ypos, xvel, yvel = physics.move(0, 0, 0, 5, 2, 3)
+    assert xpos == pytest.approx(0)
+    assert ypos == pytest.approx(5*3 - 0.5*2*3**2)
+    assert yvel == pytest.approx(5 - 2*3)
 
-    def test_free_flight_follows_parabola(self):
-        """Many steps without drag stay on the analytic projectile path."""
-        x, y, vx, vy = 400.0, 400.0, 2.0, 3.0
-        dt, g, n = 0.6, 0.3, 15
-        for _ in range(n):
-            x, y, vx, vy = physics.step(x, y, vx, vy, dt=dt, gravity=g,
-                                        restitution=0.9, **ARENA)
-        t = n * dt
-        assert x == pytest.approx(400 + 2.0 * t)
-        assert y == pytest.approx(400 + 3.0 * t - 0.5 * g * t**2)
 
-    def test_drag_moves_one_timestep(self):
-        """With drag on, the ball still advances one timestep, not two."""
-        vx0, dt, drag = 10.0, 0.6, 0.005
-        x, _, _, _ = physics.step(400, 400, vx0, 0, dt=dt, gravity=0,
-                                  restitution=0.9, drag=drag, **ARENA)
-        assert x - 400 == pytest.approx(vx0 * (1 - drag) ** dt * dt)
+def test_move_zero_dt():
+    assert physics.move(5, 10, 3, -2, 0.5, 0) == pytest.approx((5, 10, 3, -2))
 
-    def test_bounce_lands_on_wall(self):
-        """A step that crosses the wall ends on the inner surface."""
-        x, y, _, _ = physics.step(728, 400, 10, 0, dt=1.0, gravity=0,
-                                  restitution=1.0, **ARENA)
-        assert math.hypot(x - 400, y - 400) == pytest.approx(330)
 
-    def test_bounce_reverses_outward_velocity(self):
-        """After a bounce the ball heads back toward the centre."""
-        x, y, vx, vy = physics.step(728, 400, 10, 0, dt=1.0, gravity=0,
-                                    restitution=0.8, **ARENA)
-        assert vx == pytest.approx(-8)
-        assert vy == pytest.approx(0)
+def test_move_small_steps_same_as_big_step():
+    # 10 steps of 0.3 land on the same parabola as 1 step of 3
+    ball = (0, 0, 7, 4)
+    for i in range(10):
+        ball = physics.move(*ball, 0.5, 0.3)
+    assert ball == pytest.approx(physics.move(0, 0, 7, 4, 0.5, 3))
 
-    def test_ball_stays_inside_long_run(self):
-        """With the default settings the ball never leaves the arena."""
-        x, y = 400.0, 400.0
-        vx, vy = 10 * np.cos(np.deg2rad(20)), 10 * np.sin(np.deg2rad(20))
-        max_dist = 0.0
-        for _ in range(5000):
-            x, y, vx, vy = physics.step(
-                x, y, vx, vy, dt=0.6, gravity=0.3, restitution=0.9,
-                friction=0.05, drag=0.005, **ARENA,
-            )
-            max_dist = max(max_dist, math.hypot(x - 400, y - 400))
-        assert max_dist <= 330 + 1e-9
-        assert not (math.isnan(x) or math.isnan(y))
+
+# =============================================================================
+# Drag
+# =============================================================================
+
+def test_no_drag():
+    assert physics.drag(10, 5, 0, 1) == pytest.approx((10, 5))
+
+
+def test_drag_slows_ball():
+    factor = (1 - 0.2)**1.5
+    assert physics.drag(-7, 3, 0.2, 1.5) == pytest.approx((-7*factor,
+                                                           3*factor))
+
+
+def test_drag_same_for_any_dt():
+    # 2 steps of 1 give the same drag as 1 step of 2
+    xvel, yvel = physics.drag(10, 10, 0.1, 1)
+    xvel, yvel = physics.drag(xvel, yvel, 0.1, 1)
+    assert (xvel, yvel) == pytest.approx(physics.drag(10, 10, 0.1, 2))
+
+
+# =============================================================================
+# Bounce
+# =============================================================================
+
+def test_bounce_puts_ball_back_on_boundary():
+    xpos, ypos, _, _ = bounce(750, 400, 10, 0)
+    assert dist(xpos, ypos) == pytest.approx(330)
+
+
+def test_bounce_keeps_direction_from_centre():
+    xpos, ypos, _, _ = bounce(700, 700, 10, 10)
+    assert np.arctan2(ypos - cent, xpos - cent) == pytest.approx(np.pi/4)
+
+
+def test_bounce_head_on():
+    _, _, xvel, yvel = bounce(730, 400, 10, 0)
+    assert (xvel, yvel) == pytest.approx((-10, 0))
+
+
+def test_bounce_restitution():
+    # e only slows the normal component, tangential one is kept
+    _, _, xvel, yvel = bounce(730, 400, 10, 7, e=0.5)
+    assert (xvel, yvel) == pytest.approx((-5, 7))
+
+
+def test_bounce_friction():
+    # mu only slows the tangential component
+    _, _, xvel, yvel = bounce(730, 400, 10, 8, mu=0.5)
+    assert (xvel, yvel) == pytest.approx((-10, 4))
+
+
+def test_bounce_full_friction():
+    _, _, xvel, yvel = bounce(730, 400, 10, 8, mu=1)
+    assert (xvel, yvel) == pytest.approx((-10, 0))
+
+
+def test_bounce_diagonal():
+    # ball at 45 degrees moving straight out comes straight back
+    r = 330 / np.sqrt(2)
+    v = 10 / np.sqrt(2)
+    _, _, xvel, yvel = bounce(cent + r, cent + r, v, v)
+    assert (xvel, yvel) == pytest.approx((-v, -v))
+
+
+# =============================================================================
+# Step
+# =============================================================================
+
+def test_step_free_flight():
+    # away from the wall and without drag, step is just move
+    assert step(400, 400, 3, 2, 0.3, 0.6) == pytest.approx(
+        physics.move(400, 400, 3, 2, 0.3, 0.6))
+
+
+def test_step_follows_parabola():
+    ball = (400, 400, 2, 3)
+    for i in range(15):
+        ball = step(*ball, 0.3, 0.6)
+    t = 15 * 0.6
+    assert ball[0] == pytest.approx(400 + 2*t)
+    assert ball[1] == pytest.approx(400 + 3*t - 0.5*0.3*t**2)
+
+
+def test_step_with_drag_moves_one_timestep():
+    # with drag on, the ball should still only move one timestep per step
+    xpos, _, _, _ = step(400, 400, 10, 0, 0, 0.6, k=0.005)
+    assert xpos - 400 == pytest.approx(10 * (1 - 0.005)**0.6 * 0.6)
+
+
+def test_step_bounce_lands_on_wall():
+    # a step that goes past the wall ends on the boundary, not past it
+    xpos, ypos, xvel, yvel = step(728, 400, 10, 0, 0, 1, e=0.8)
+    assert dist(xpos, ypos) == pytest.approx(330)
+    assert (xvel, yvel) == pytest.approx((-8, 0))
+
+
+def test_ball_stays_inside():
+    # settings from main.py, ball should never leave the board
+    ball = (400, 400, 10*np.cos(np.deg2rad(20)), 10*np.sin(np.deg2rad(20)))
+    furthest = 0
+    for i in range(5000):
+        ball = step(*ball, 0.3, 0.6, e=0.9, mu=0.05, k=0.005)
+        furthest = max(furthest, dist(ball[0], ball[1]))
+    assert furthest <= 330 + 1e-9

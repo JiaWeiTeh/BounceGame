@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Bouncing ball simulation inside a circular boundary.
+"""
+Ball bouncing inside a circular boundary.
 
-Animates a ball with projectile motion, gravity, and energy loss
-on collision with the circular wall.
+Run `python main.py` to watch it, or `python main.py --save bounce.gif` to
+save it as a video.
 """
 
 import argparse
@@ -14,62 +15,56 @@ import numpy as np
 import physics
 
 # =============================================================================
-# Configuration
+# Initial setup
 # =============================================================================
+# dimension of board
+boardx, boardy = [800, 800]
+# radius and center of circle
+cent = 400
+rad = 340
+# empty space around the board in the plot
+pad = 200
+# ball radius (for collisions) and marker size (for plotting, in points)
+ball_rad = 10
+ball_ms = 10
+# initial position of ball
+x0, y0 = [cent, cent]
+# initial velocity
+v0 = 10
+# launch angle
+theta = np.deg2rad(20)
+# gravitational acceleration
+g = 0.3
+# coeff of restitution
+e = 0.9
+# friction with the wall, slows the ball along the wall at each bounce
+mu = 0.05
+# air drag
+k = 0.005
+# timestep
+dt = 0.6   # fast/slow motion by changing dt
 
-# Arena geometry
-BOARD_SIZE = 800
-CENTER = BOARD_SIZE // 2
-RADIUS = 340
-AXIS_PADDING = 200
-
-# Ball properties
-BALL_MARKER_SIZE = 10       # visual marker size in points
-BALL_COLLISION_RADIUS = 10  # collision offset in data coordinates
-INITIAL_SPEED = 10
-INITIAL_ANGLE = np.deg2rad(20)
-INITIAL_X, INITIAL_Y = CENTER, CENTER
-
-# Physics
-GRAVITY = 0.3
-RESTITUTION = 0.9
-FRICTION = 0.05           # tangential energy loss on wall collision (0–1)
-AIR_DRAG = 0.005          # air resistance coefficient (0–1)
-DT = 0.6
-
+# =============================================================================
 # Animation
-NUM_FRAMES = 500
-FRAME_INTERVAL_MS = 5
-
-# Saved video (python main.py --save FILE)
-VIDEO_SECONDS = 12
-VIDEO_STEPS_PER_SECOND = 50    # simulation steps shown per second of video
-VIDEO_FPS = {'.mp4': 50, '.gif': 25}  # GIF timing is exact at 25 fps
-VIDEO_DPI = {'.mp4': 100, '.gif': 80}
-
+# =============================================================================
+frames = 500    # change length of the animation
+interval = 5    # change to slow/fast motion
 
 # =============================================================================
-# Setup and animation
+# Save movie
 # =============================================================================
-
-def setup_figure():
-    """Create figure, axes, boundary, and ball artist."""
-    fig = plt.figure(figsize=(7, 7), dpi=100)
-    ax = plt.axes(
-        xlim=(-AXIS_PADDING, BOARD_SIZE + AXIS_PADDING),
-        ylim=(-AXIS_PADDING, BOARD_SIZE + AXIS_PADDING),
-    )
-    ax.xaxis.set_ticks([])
-    ax.yaxis.set_ticks([])
-    physics.draw(ax, RADIUS, CENTER)
-    plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=BALL_MARKER_SIZE)
-    return fig, plot_ball
+seconds = 12
+steps_per_sec = 50   # timesteps shown per second of video
+fps = {'.mp4': 50, '.gif': 25}    # gif timing is only exact at 25 fps
+dpi = {'.mp4': 100, '.gif': 80}
 
 
-def parse_args(argv=None):
-    """Parse command-line options."""
+def get_args(argv=None):
+    """
+    Read options from the command line.
+    """
     parser = argparse.ArgumentParser(
-        description="Animate a ball bouncing inside a circular wall."
+        description="Ball bouncing inside a circular boundary."
     )
     parser.add_argument(
         '--save', metavar='FILE',
@@ -77,84 +72,77 @@ def parse_args(argv=None):
              "instead of opening a window",
     )
     parser.add_argument(
-        '--seconds', type=float, default=VIDEO_SECONDS,
+        '--seconds', type=float, default=seconds,
         help="length of the saved video in seconds (default: %(default)s)",
     )
     return parser.parse_args(argv)
 
 
-def make_writer(path):
-    """Return a Matplotlib movie writer and dpi for the file extension."""
+def get_writer(path):
+    """
+    Return movie writer and dpi based on the file extension.
+    """
     ext = os.path.splitext(path)[1].lower()
-    if ext not in VIDEO_FPS:
-        raise SystemExit(f"Cannot save '{path}': use a .gif or .mp4 name.")
-    fps = VIDEO_FPS[ext]
     if ext == '.gif':
-        return animation.PillowWriter(fps=fps), VIDEO_DPI[ext]
-    if not animation.writers.is_available('ffmpeg'):
-        raise SystemExit(
-            "Saving .mp4 needs ffmpeg. Install it, or save a .gif instead."
+        return animation.PillowWriter(fps=fps[ext]), dpi[ext]
+    if ext == '.mp4':
+        if not animation.writers.is_available('ffmpeg'):
+            raise SystemExit(
+                "Saving .mp4 needs ffmpeg. Install it, or save a .gif instead."
+            )
+        writer = animation.FFMpegWriter(
+            fps=fps[ext], extra_args=['-movflags', '+faststart'],
         )
-    writer = animation.FFMpegWriter(
-        fps=fps, extra_args=['-movflags', '+faststart'],
-    )
-    return writer, VIDEO_DPI[ext]
+        return writer, dpi[ext]
+    raise SystemExit(f"Cannot save '{path}': use a .gif or .mp4 name.")
 
 
 def main(argv=None):
-    """Run the bounce simulation in a window, or save it to a file."""
-    args = parse_args(argv)
+    args = get_args(argv)
+
     if args.save:
-        writer, dpi = make_writer(args.save)
-        plt.switch_backend('Agg')  # render off screen, no window
-        steps_per_frame = VIDEO_STEPS_PER_SECOND // writer.fps
-        frames = max(1, round(args.seconds * writer.fps))
+        writer, save_dpi = get_writer(args.save)
+        plt.switch_backend('Agg')   # draw off screen, no window
+        # gif has fewer frames per second, so move more timesteps per frame
+        steps = steps_per_sec // writer.fps
+        nframes = max(1, round(args.seconds * writer.fps))
     else:
-        steps_per_frame = 1
-        frames = NUM_FRAMES
+        steps = 1
+        nframes = frames
 
-    fig, plot_ball = setup_figure()
-
-    # Mutable simulation state, captured by the closures below
-    state = {
-        'x': float(INITIAL_X),
-        'y': float(INITIAL_Y),
-        'vx': INITIAL_SPEED * np.cos(INITIAL_ANGLE),
-        'vy': INITIAL_SPEED * np.sin(INITIAL_ANGLE),
-    }
+    # draw boundary
+    fig = plt.figure(figsize=(7, 7), dpi=100)
+    ax = plt.axes(xlim=(0-pad, boardx+pad), ylim=(0-pad, boardy+pad))
+    ax.xaxis.set_ticks([])
+    ax.yaxis.set_ticks([])
+    physics.draw(ax, rad, cent)
+    # plot ball
+    plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=ball_ms)
+    # launch ball from (x0, y0) with speed v0 at angle theta
+    xpos, ypos = [x0, y0]
+    xvel, yvel = [v0 * np.cos(theta), v0 * np.sin(theta)]
 
     def init():
-        plot_ball.set_data([state['x']], [state['y']])
+        plot_ball.set_data([xpos], [ypos])
         return plot_ball,
 
-    def animate(_frame):
-        for _ in range(steps_per_frame):
-            state['x'], state['y'], state['vx'], state['vy'] = physics.step(
-                state['x'], state['y'], state['vx'], state['vy'],
-                dt=DT,
-                gravity=GRAVITY,
-                center=CENTER,
-                radius=RADIUS,
-                ball_radius=BALL_COLLISION_RADIUS,
-                restitution=RESTITUTION,
-                friction=FRICTION,
-                drag=AIR_DRAG,
-            )
-        plot_ball.set_data([state['x']], [state['y']])
+    def animate(i):
+        nonlocal xpos, ypos, xvel, yvel
+        for _ in range(steps):
+            xpos, ypos, xvel, yvel = physics.step(xpos, ypos, xvel, yvel,
+                                                  cent, rad, ball_rad,
+                                                  g, dt, e, mu, k)
+        plot_ball.set_data([xpos], [ypos])
         return plot_ball,
 
-    anim = animation.FuncAnimation(
-        fig,
-        animate,
-        init_func=init,
-        frames=frames,
-        interval=FRAME_INTERVAL_MS,
-        blit=True,
-        repeat=not args.save,
-    )
+    anim = animation.FuncAnimation(fig, animate, init_func=init,
+                                   frames=nframes,
+                                   interval=interval,
+                                   blit=True,
+                                   repeat=not args.save)
 
     if args.save:
-        anim.save(args.save, writer=writer, dpi=dpi)
+        anim.save(args.save, writer=writer, dpi=save_dpi)
         plt.close(fig)
         print(f"Saved {args.save}")
     else:

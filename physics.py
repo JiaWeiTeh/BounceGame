@@ -1,136 +1,80 @@
 # -*- coding: utf-8 -*-
-"""Physics helper functions for the bounce simulation.
-
-Provides drawing, kinematics, collision handling, air drag, and a
-single-timestep update that combines them.
-"""
+"""Functions to draw the boundary and to move and bounce the ball."""
 
 import numpy as np
 
 
-def draw(ax, radius, center):
-    """Draw circular boundary on the given axes."""
-    angle = np.linspace(0, 2 * np.pi, 200)
+def draw(ax, rad, cent):
+    """
+    Draw the circular boundary on ax.
+    """
+    angle = np.linspace(0, 2*np.pi, 200)
 
-    x = radius * np.cos(angle) + center
-    y = radius * np.sin(angle) + center
+    x = rad*np.cos(angle) + cent
+    y = rad*np.sin(angle) + cent
 
     ax.plot(x, y, c='green')
 
 
-def move(x, y, vx, vy, gravity, dt):
-    """Advance a ball under constant downward gravity for a time dt.
-
-    Uses the exact constant-acceleration equations, so several short
-    steps land on the same parabola as one long step.
-
-    Returns (x, y, vx, vy).
+def move(xpos, ypos, xvel, yvel, g, dt):
     """
-    new_x = x + vx * dt
-    new_y = y + vy * dt - 0.5 * gravity * dt**2
-    new_vy = vy - gravity * dt
-
-    return new_x, new_y, vx, new_vy
-
-
-def clamp_to_boundary(xpos, ypos, center, radius, ball_radius):
-    """Project a position back onto the circle boundary (minus ball radius).
-
-    Returns the clamped (x, y) on the inner boundary surface.
+    Return position and velocity after a time dt, from the trajectory equation.
     """
-    dx = xpos - center
-    dy = ypos - center
+    # projectile motion, exact for any dt since g is constant
+    xpos = xpos + xvel * dt
+    ypos = ypos + yvel * dt - 0.5 * g * dt**2
+    yvel = yvel - g * dt
+
+    return xpos, ypos, xvel, yvel
+
+
+def drag(xvel, yvel, k, dt):
+    """
+    Return velocity after air drag k slows the ball down over a time dt.
+    """
+    # v -> v * (1-k)^dt, so the total drag doesn't depend on dt
+    factor = (1 - k)**dt
+
+    return xvel * factor, yvel * factor
+
+
+def bounce(xpos, ypos, xvel, yvel, cent, rad, ball_rad, e, mu):
+    """
+    Put the ball back on the boundary and bounce it off.
+    """
+    # 1. push ball back onto the boundary, along the line from the centre
+    dx = xpos - cent
+    dy = ypos - cent
     dist = np.sqrt(dx**2 + dy**2)
-    if dist == 0:
-        # Degenerate: ball exactly at center, push in arbitrary direction
-        return center + (radius - ball_radius), center
-    max_dist = radius - ball_radius
-    scale = max_dist / dist
-    return center + dx * scale, center + dy * scale
+    scale = (rad - ball_rad) / dist
+    xpos = cent + dx * scale
+    ypos = cent + dy * scale
+    # 2. norm of contact point, pointing in towards the centre
+    nx = cent - xpos
+    ny = cent - ypos
+    norm = np.sqrt(nx**2 + ny**2)
+    nx, ny = [nx/norm, ny/norm]
+    # 3. split velocity into normal and tangential components
+    vn = xvel * nx + yvel * ny
+    vn_x, vn_y = [vn * nx, vn * ny]
+    vt_x, vt_y = [xvel - vn_x, yvel - vn_y]
+    # 4. reverse normal component (energy loss from e), and slow down
+    # tangential component from friction mu
+    xvel = (1 - mu) * vt_x - e * vn_x
+    yvel = (1 - mu) * vt_y - e * vn_y
+
+    return xpos, ypos, xvel, yvel
 
 
-def reflect_velocity(xvel, yvel, xpos, ypos, center, restitution,
-                     friction=0.0):
-    """Reflect velocity off the circular boundary using vector math.
-
-    Uses the inward-pointing normal of the circle at the contact point.
-    The coefficient of restitution is applied only to the normal component,
-    and friction is applied only to the tangential component.
-
-    Args:
-        xvel, yvel: Incoming velocity components.
-        xpos, ypos: Ball position at point of contact.
-        center: Center coordinate of the circular boundary.
-        restitution: Coefficient of restitution (0–1) for the normal component.
-        friction: Coefficient of friction (0–1) for the tangential component.
-            0 = no friction (tangential speed fully preserved),
-            1 = full friction (tangential speed zeroed on contact).
-
-    Returns (new_vx, new_vy).
+def step(xpos, ypos, xvel, yvel, cent, rad, ball_rad, g, dt, e, mu, k):
     """
-    # Normal vector pointing inward (from contact point toward center)
-    nx = center - xpos
-    ny = center - ypos
-    n_mag = np.sqrt(nx**2 + ny**2)
-    if n_mag == 0:
-        # Degenerate case: ball at exact center, return velocity unchanged
-        return xvel, yvel
-    nx /= n_mag
-    ny /= n_mag
-
-    # Decompose velocity into normal and tangential components
-    v_dot_n = xvel * nx + yvel * ny
-    # Normal component (into the wall is negative v_dot_n)
-    vn_x = v_dot_n * nx
-    vn_y = v_dot_n * ny
-    # Tangential component
-    vt_x = xvel - vn_x
-    vt_y = yvel - vn_y
-
-    # Reflect normal, apply restitution to normal and friction to tangential
-    new_vx = (1 - friction) * vt_x - restitution * vn_x
-    new_vy = (1 - friction) * vt_y - restitution * vn_y
-
-    return new_vx, new_vy
-
-
-def apply_drag(vx, vy, drag, dt):
-    """Apply air drag to velocity components over a timestep.
-
-    Uses an exponential decay model: v_new = v * (1 - drag)^dt.
-    This is frame-rate independent — the same total drag is applied
-    regardless of how dt is subdivided.
-
-    Args:
-        vx, vy: Velocity components.
-        drag: Drag coefficient (0–1). 0 = no drag, higher = more drag.
-        dt: Timestep duration.
-
-    Returns (new_vx, new_vy).
+    Move the ball by one timestep dt, and bounce it if it hits the boundary.
     """
-    if drag <= 0:
-        return vx, vy
-    factor = (1 - drag) ** dt
-    return vx * factor, vy * factor
+    xvel, yvel = drag(xvel, yvel, k, dt)
+    xpos, ypos, xvel, yvel = move(xpos, ypos, xvel, yvel, g, dt)
+    # if ball touches or goes past the boundary
+    if np.sqrt((xpos - cent)**2 + (ypos - cent)**2) >= rad - ball_rad:
+        xpos, ypos, xvel, yvel = bounce(xpos, ypos, xvel, yvel,
+                                        cent, rad, ball_rad, e, mu)
 
-
-def step(x, y, vx, vy, dt, gravity, center, radius, ball_radius,
-         restitution, friction=0.0, drag=0.0):
-    """Advance the ball by one timestep inside the circular wall.
-
-    Applies air drag, moves the ball under gravity, and bounces it off
-    the wall if it reached the boundary. The ball moves exactly one
-    timestep per call, including on frames where it bounces.
-
-    Returns (x, y, vx, vy).
-    """
-    vx, vy = apply_drag(vx, vy, drag, dt)
-    x, y, vx, vy = move(x, y, vx, vy, gravity, dt)
-
-    if np.hypot(x - center, y - center) >= radius - ball_radius:
-        x, y = clamp_to_boundary(x, y, center, radius, ball_radius)
-        vx, vy = reflect_velocity(
-            vx, vy, x, y, center, restitution, friction
-        )
-
-    return x, y, vx, vy
+    return xpos, ypos, xvel, yvel
