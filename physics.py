@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Physics helper functions for the bounce simulation.
 
-Provides drawing, kinematics, and collision-reflection utilities.
+Provides drawing, kinematics, collision handling, air drag, and a
+single-timestep update that combines them.
 """
 
 import numpy as np
@@ -17,20 +18,19 @@ def draw(ax, radius, center):
     ax.plot(x, y, c='green')
 
 
-def get_vel(t, theta, vel, g):
-    """Return velocity components (vx, vy) at time t given initial launch angle."""
-    xvel = vel * np.cos(theta)
-    yvel = vel * np.sin(theta) - g * t
+def move(x, y, vx, vy, gravity, dt):
+    """Advance a ball under constant downward gravity for a time dt.
 
-    return xvel, yvel
+    Uses the exact constant-acceleration equations, so several short
+    steps land on the same parabola as one long step.
 
+    Returns (x, y, vx, vy).
+    """
+    new_x = x + vx * dt
+    new_y = y + vy * dt - 0.5 * gravity * dt**2
+    new_vy = vy - gravity * dt
 
-def get_pos(t, theta, x0, y0, vel, g):
-    """Return position (x, y) at time t given initial launch angle and position."""
-    xpos = vel * np.cos(theta) * t + x0
-    ypos = vel * np.sin(theta) * t - 0.5 * g * t**2 + y0
-
-    return xpos, ypos
+    return new_x, new_y, vx, new_vy
 
 
 def clamp_to_boundary(xpos, ypos, center, radius, ball_radius):
@@ -112,3 +112,25 @@ def apply_drag(vx, vy, drag, dt):
         return vx, vy
     factor = (1 - drag) ** dt
     return vx * factor, vy * factor
+
+
+def step(x, y, vx, vy, dt, gravity, center, radius, ball_radius,
+         restitution, friction=0.0, drag=0.0):
+    """Advance the ball by one timestep inside the circular wall.
+
+    Applies air drag, moves the ball under gravity, and bounces it off
+    the wall if it reached the boundary. The ball moves exactly one
+    timestep per call, including on frames where it bounces.
+
+    Returns (x, y, vx, vy).
+    """
+    vx, vy = apply_drag(vx, vy, drag, dt)
+    x, y, vx, vy = move(x, y, vx, vy, gravity, dt)
+
+    if np.hypot(x - center, y - center) >= radius - ball_radius:
+        x, y = clamp_to_boundary(x, y, center, radius, ball_radius)
+        vx, vy = reflect_velocity(
+            vx, vy, x, y, center, restitution, friction
+        )
+
+    return x, y, vx, vy

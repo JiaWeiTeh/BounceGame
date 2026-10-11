@@ -63,67 +63,29 @@ def main():
 
     # Mutable simulation state, captured by the closures below
     state = {
-        't': 0.0,
-        'v0': INITIAL_SPEED,
-        'theta': INITIAL_ANGLE,
-        'x0': float(INITIAL_X),
-        'y0': float(INITIAL_Y),
+        'x': float(INITIAL_X),
+        'y': float(INITIAL_Y),
+        'vx': INITIAL_SPEED * np.cos(INITIAL_ANGLE),
+        'vy': INITIAL_SPEED * np.sin(INITIAL_ANGLE),
     }
 
     def init():
-        plot_ball.set_data(state['x0'], state['y0'])
+        plot_ball.set_data([state['x']], [state['y']])
         return plot_ball,
 
-    def animate(i):
-        state['t'] += DT
-
-        # Apply air drag: get current velocity, reduce it, reset trajectory
-        if AIR_DRAG > 0:
-            xvel, yvel = physics.get_vel(
-                state['t'], state['theta'], state['v0'], GRAVITY,
-            )
-            xpos, ypos = physics.get_pos(
-                state['t'], state['theta'], state['x0'], state['y0'],
-                state['v0'], GRAVITY,
-            )
-            drag_vx, drag_vy = physics.apply_drag(xvel, yvel, AIR_DRAG, DT)
-            state['v0'] = np.sqrt(drag_vx**2 + drag_vy**2)
-            state['theta'] = np.arctan2(drag_vy, drag_vx)
-            state['x0'], state['y0'] = xpos, ypos
-            state['t'] = DT
-
-        xpos, ypos = physics.get_pos(
-            state['t'], state['theta'], state['x0'], state['y0'],
-            state['v0'], GRAVITY,
+    def animate(_frame):
+        state['x'], state['y'], state['vx'], state['vy'] = physics.step(
+            state['x'], state['y'], state['vx'], state['vy'],
+            dt=DT,
+            gravity=GRAVITY,
+            center=CENTER,
+            radius=RADIUS,
+            ball_radius=BALL_COLLISION_RADIUS,
+            restitution=RESTITUTION,
+            friction=FRICTION,
+            drag=AIR_DRAG,
         )
-
-        effective_rad = RADIUS - BALL_COLLISION_RADIUS
-        dist = np.sqrt((xpos - CENTER)**2 + (ypos - CENTER)**2)
-
-        if dist >= effective_rad:
-            # Clamp position back onto the boundary surface
-            xpos, ypos = physics.clamp_to_boundary(
-                xpos, ypos, CENTER, RADIUS, BALL_COLLISION_RADIUS
-            )
-            # Reflect velocity off the circular wall (with friction)
-            xvel, yvel = physics.get_vel(
-                state['t'], state['theta'], state['v0'], GRAVITY,
-            )
-            new_vx, new_vy = physics.reflect_velocity(
-                xvel, yvel, xpos, ypos, CENTER, RESTITUTION, FRICTION
-            )
-            # Convert reflected velocity back to speed + angle
-            state['v0'] = np.sqrt(new_vx**2 + new_vy**2)
-            state['theta'] = np.arctan2(new_vy, new_vx)
-            # Reset trajectory origin
-            state['t'] = DT
-            state['x0'], state['y0'] = xpos, ypos
-            xpos, ypos = physics.get_pos(
-                state['t'], state['theta'], state['x0'], state['y0'],
-                state['v0'], GRAVITY,
-            )
-
-        plot_ball.set_data(xpos, ypos)
+        plot_ball.set_data([state['x']], [state['y']])
         return plot_ball,
 
     _anim = animation.FuncAnimation(
