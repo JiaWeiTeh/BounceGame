@@ -1,14 +1,25 @@
 # BounceGame
 
-A small hobby project: a ball bouncing inside a circular wall, animated
-with Python and Matplotlib. I wrote it as a mini exercise to get to know
-animation and object-oriented Python better.
-
-The ball follows projectile motion under gravity. It loses energy on each
-bounce through restitution and wall friction, and slows in flight from air
-drag.
+A small hobby project. I'm interested in the trajectory of a ball bouncing
+around inside a circle, and wanted to see if I could still implement the
+high school maths behind it and visualise it with Python and Matplotlib.
 
 ![Ball bouncing inside a circular wall](assets/bounce.gif)
+
+## The maths
+
+Between bounces the ball follows one trajectory equation, projectile motion
+under gravity:
+
+```math
+x = x_0 + v_x t, \qquad y = y_0 + v_y t - \tfrac{1}{2} g t^2
+```
+
+Each frame moves the ball along this parabola for one timestep. When the ball
+reaches the wall, its velocity is split into the part pointing into the wall
+and the part along it. The part into the wall is reversed, and the ball sets
+off on a new parabola. Restitution, wall friction and air drag each take a
+little energy away, so the bounces slowly die down.
 
 ## Install
 
@@ -47,28 +58,28 @@ made with `python main.py --save assets/bounce.gif`.
 
 ## Settings
 
-Edit the constants at the top of `main.py`. The main ones are:
+Edit the values at the top of `main.py`. The main ones are:
 
-| Constant | Default | Meaning |
+| Name | Default | Meaning |
 |---|---|---|
-| `RADIUS` | 340 | Radius of the circular wall |
-| `BALL_COLLISION_RADIUS` | 10 | Ball radius used for collisions |
-| `BALL_MARKER_SIZE` | 10 | Drawn ball size, in points |
-| `INITIAL_SPEED` | 10 | Launch speed |
-| `INITIAL_ANGLE` | 20° | Launch angle above horizontal |
-| `GRAVITY` | 0.3 | Downward acceleration |
-| `RESTITUTION` | 0.9 | Share of speed into the wall kept per bounce (0–1) |
-| `FRICTION` | 0.05 | Share of speed along the wall lost per bounce (0–1) |
-| `AIR_DRAG` | 0.005 | Share of speed lost per unit time in flight (0–1) |
-| `DT` | 0.6 | Simulation time per frame |
+| `rad` | 340 | Radius of the circular boundary |
+| `ball_rad` | 10 | Ball radius used for collisions |
+| `ball_ms` | 10 | Drawn ball size, in points |
+| `v0` | 10 | Launch speed |
+| `theta` | 20° | Launch angle above horizontal |
+| `g` | 0.3 | Gravitational acceleration |
+| `e` | 0.9 | Coeff of restitution: share of speed into the wall kept per bounce (0–1) |
+| `mu` | 0.05 | Friction: share of speed along the wall lost per bounce (0–1) |
+| `k` | 0.005 | Air drag: share of speed lost per unit time in flight (0–1) |
+| `dt` | 0.6 | Timestep per frame |
 
 Units are arbitrary: distances are plot coordinates and time is simulation
 time.
 
 ## Files
 
-- `main.py` sets up the figure, holds the settings and runs the animation.
-- `physics.py` holds the motion, bounce and drag calculations.
+- `main.py` holds the settings, draws the board and runs the animation.
+- `physics.py` holds the functions for the motion, bounce and drag.
 - `test_physics.py` and `test_main.py` hold the tests.
 - `assets/bounce.gif` is the demo animation.
 
