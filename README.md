@@ -4,7 +4,7 @@ A small hobby project. I'm interested in the trajectory of a ball bouncing
 around inside a circle, and wanted to see if I could still implement the
 high school maths behind it and visualise it with Python and Matplotlib.
 
-![Ball bouncing inside a circular wall](assets/bounce.gif)
+![A ball bouncing inside six different shapes](assets/bounce.gif)
 
 ## The maths
 
@@ -67,6 +67,12 @@ The shapes are `circle`, `triangle`, `square`, `pentagon`, `hexagon` and
 always land on a flat side at the bottom. The angle is printed, and `--tilt`
 sets it in degrees. For example, `--tilt 0` puts a flat side at the bottom.
 
+To see every shape side by side, as in the demo above:
+
+```bash
+python main.py --shape all
+```
+
 ## Save a video
 
 ```bash
@@ -78,7 +84,7 @@ python main.py --save square.gif --shape square --tilt 45
 GIF works out of the box. MP4 needs [ffmpeg](https://ffmpeg.org), for
 example `brew install ffmpeg` or `conda install -c conda-forge ffmpeg`.
 Clips last 12 seconds unless you pass `--seconds`. The demo above was
-made with `python main.py --save assets/bounce.gif`.
+made with `python main.py --shape all --tilt 35 --save assets/bounce.gif`.
 
 ## Settings
 
@@ -86,7 +92,7 @@ Edit the values at the top of `main.py`. The main ones are:
 
 | Name | Default | Meaning |
 |---|---|---|
-| `shape` | `'circle'` | Shape of the boundary, also set with `--shape` |
+| `shape` | `'circle'` | Shape of the boundary, or `'all'` for every shape side by side. Also set with `--shape` |
 | `tilt` | `None` | Angle to turn the shape by, in degrees. `None` picks a random angle each run |
 | `rad` | 340 | Radius of the circle, or distance from the centre to the corners of other shapes |
 | `ball_rad` | 10 | Ball radius used for collisions |
@@ -107,7 +113,7 @@ time.
 - `main.py` holds the settings, draws the board and runs the animation.
 - `physics.py` holds the functions for the motion, bounce and drag.
 - `test_physics.py` and `test_main.py` hold the tests.
-- `assets/bounce.gif` is the demo animation.
+- `assets/bounce.gif` is the demo animation of all six shapes.
 
 ## Test
 

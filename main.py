@@ -19,7 +19,8 @@ import physics
 # =============================================================================
 # dimension of board
 boardx, boardy = [800, 800]
-# shape of the boundary, and how many sides it has (0 for a circle)
+# shape of the boundary ('all' shows every shape side by side), and how many
+# sides each one has (0 for a circle)
 shape = 'circle'
 sides = {'circle': 0, 'triangle': 3, 'square': 4, 'pentagon': 5,
          'hexagon': 6, 'octagon': 8}
@@ -64,7 +65,7 @@ interval = 5    # change to slow/fast motion
 seconds = 12
 steps_per_sec = 50   # timesteps shown per second of video
 fps = {'.mp4': 50, '.gif': 25}    # gif timing is only exact at 25 fps
-dpi = {'.mp4': 100, '.gif': 80}
+dpi = {'.mp4': 100, '.gif': 70}
 
 
 def get_args(argv=None):
@@ -84,8 +85,9 @@ def get_args(argv=None):
         help="length of the saved video in seconds (default: %(default)s)",
     )
     parser.add_argument(
-        '--shape', choices=sides, default=shape,
-        help="shape of the boundary (default: %(default)s)",
+        '--shape', choices=list(sides) + ['all'], default=shape,
+        help="shape of the boundary, or all of them side by side "
+             "(default: %(default)s)",
     )
     parser.add_argument(
         '--tilt', type=float, default=tilt, metavar='DEG',
@@ -126,38 +128,62 @@ def main(argv=None):
         steps = 1
         nframes = frames
 
-    # draw boundary
-    fig = plt.figure(figsize=(7, 7), dpi=100)
-    ax = plt.axes(xlim=(0-pad, boardx+pad), ylim=(0-pad, boardy+pad))
-    ax.xaxis.set_ticks([])
-    ax.yaxis.set_ticks([])
-    nsides = sides[args.shape]
-    deg = args.tilt
-    if deg is None:
-        deg = np.random.randint(360)
-        if nsides > 0:
-            print(f"{args.shape} turned by {deg} degrees, "
-                  f"use --tilt {deg} to get the same one again")
-    turn = np.deg2rad(deg)
-    physics.draw(ax, rad, cent, nsides, turn)
-    # plot ball
-    plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=ball_ms)
-    # launch ball from (x0, y0) with speed v0 at angle theta
-    xpos, ypos = [x0, y0]
-    xvel, yvel = [v0 * np.cos(theta), v0 * np.sin(theta)]
+    # shapes to show: just one, or all of them side by side
+    if args.shape == 'all':
+        shapes = list(sides)
+        fig, axes = plt.subplots(2, 3, figsize=(10.5, 7), dpi=100)
+        axes = axes.flatten()
+    else:
+        shapes = [args.shape]
+        fig = plt.figure(figsize=(7, 7), dpi=100)
+        axes = [plt.axes()]
+
+    balls = []
+    turns = []
+    plot_balls = []
+    for shape, ax in zip(shapes, axes):
+        # draw boundary
+        ax.set_xlim(0-pad, boardx+pad)
+        ax.set_ylim(0-pad, boardy+pad)
+        ax.xaxis.set_ticks([])
+        ax.yaxis.set_ticks([])
+        if len(shapes) > 1:
+            # panels are small, so zoom in on the shape
+            ax.set_xlim(cent-rad-30, cent+rad+30)
+            ax.set_ylim(cent-rad-30, cent+rad+30)
+            ax.set_aspect('equal')
+            ax.set_title(shape)
+        deg = args.tilt
+        if deg is None:
+            deg = np.random.randint(360)
+            if sides[shape] > 0 and len(shapes) == 1:
+                print(f"{shape} turned by {deg} degrees, "
+                      f"use --tilt {deg} to get the same one again")
+            elif sides[shape] > 0:
+                print(f"{shape} turned by {deg} degrees")
+        turns.append(np.deg2rad(deg))
+        physics.draw(ax, rad, cent, sides[shape], turns[-1])
+        # plot ball
+        plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=ball_ms)
+        plot_balls.append(plot_ball)
+        # launch ball from (x0, y0) with speed v0 at angle theta
+        balls.append([x0, y0, v0 * np.cos(theta), v0 * np.sin(theta)])
+    if len(shapes) > 1:
+        fig.tight_layout()
 
     def init():
-        plot_ball.set_data([xpos], [ypos])
-        return plot_ball,
+        for ball, plot_ball in zip(balls, plot_balls):
+            plot_ball.set_data([ball[0]], [ball[1]])
+        return plot_balls
 
     def animate(i):
-        nonlocal xpos, ypos, xvel, yvel
-        for _ in range(steps):
-            xpos, ypos, xvel, yvel = physics.step(xpos, ypos, xvel, yvel,
-                                                  cent, rad, ball_rad, nsides,
-                                                  g, dt, e, mu, k, turn)
-        plot_ball.set_data([xpos], [ypos])
-        return plot_ball,
+        for j, shape in enumerate(shapes):
+            for _ in range(steps):
+                balls[j] = physics.step(*balls[j], cent, rad, ball_rad,
+                                        sides[shape], g, dt, e, mu, k,
+                                        turns[j])
+            plot_balls[j].set_data([balls[j][0]], [balls[j][1]])
+        return plot_balls
 
     anim = animation.FuncAnimation(fig, animate, init_func=init,
                                    frames=nframes,

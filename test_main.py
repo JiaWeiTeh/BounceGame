@@ -50,3 +50,13 @@ def test_fixed_tilt_is_not_printed(tmp_path, capsys):
     main.main(["--save", str(tmp_path / "t.gif"), "--seconds", "0.1",
                "--shape", "triangle", "--tilt", "30"])
     assert "use --tilt" not in capsys.readouterr().out
+
+
+def test_save_all_shapes(tmp_path, capsys):
+    # every shape side by side, each polygon turned at its own random angle
+    out = tmp_path / "all.gif"
+    main.main(["--save", str(out), "--seconds", "0.2", "--shape", "all"])
+    assert out.read_bytes()[:6] == b"GIF89a"
+    printed = capsys.readouterr().out
+    for shape in ["triangle", "square", "pentagon", "hexagon", "octagon"]:
+        assert f"{shape} turned by" in printed
