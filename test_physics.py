@@ -19,9 +19,13 @@ def bounce(xpos, ypos, xvel, yvel, e=1, mu=0, sides=0):
                           e, mu)
 
 
-def step(xpos, ypos, xvel, yvel, g, dt, e=1, mu=0, k=0, sides=0):
-    return physics.step(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides,
-                        g, dt, e, mu, k)
+def launch(xpos, ypos, xvel, yvel):
+    # ball (t, theta, x0, y0, v0) launched from (xpos, ypos) with (xvel, yvel)
+    return (0, np.arctan2(yvel, xvel), xpos, ypos, np.hypot(xvel, yvel))
+
+
+def step(ball, g, dt, e=1, mu=0, k=0, sides=0):
+    return physics.step(*ball, cent, rad, ball_rad, sides, g, dt, e, mu, k)
 
 
 def furthest_past_wall(xpos, ypos, sides, tilt=0):
@@ -32,31 +36,40 @@ def furthest_past_wall(xpos, ypos, sides, tilt=0):
 
 
 # =============================================================================
-# Move
+# Trajectory
 # =============================================================================
 
-def test_move_horizontal():
+def test_pos_at_launch():
+    assert physics.get_pos(0, 0.3, 5, 10, 10, 0.5) == pytest.approx((5, 10))
+
+
+def test_pos_horizontal():
     # x moves in a straight line, y only falls from gravity
-    assert physics.move(0, 0, 10, 0, 1, 2) == pytest.approx((20, -2, 10, -2))
+    assert physics.get_pos(2, 0, 0, 0, 10, 1) == pytest.approx((20, -2))
 
 
-def test_move_vertical():
-    xpos, ypos, xvel, yvel = physics.move(0, 0, 0, 5, 2, 3)
-    assert xpos == pytest.approx(0)
+def test_pos_vertical():
+    xpos, ypos = physics.get_pos(3, np.pi/2, 0, 0, 5, 2)
+    assert xpos == pytest.approx(0, abs=1e-12)
     assert ypos == pytest.approx(5*3 - 0.5*2*3**2)
-    assert yvel == pytest.approx(5 - 2*3)
 
 
-def test_move_zero_dt():
-    assert physics.move(5, 10, 3, -2, 0.5, 0) == pytest.approx((5, 10, 3, -2))
+def test_pos_45_degrees():
+    t, v, g = [1, 10, 0.5]
+    xpos, ypos = physics.get_pos(t, np.pi/4, 0, 0, v, g)
+    assert xpos == pytest.approx(v * np.cos(np.pi/4) * t)
+    assert ypos == pytest.approx(v * np.sin(np.pi/4) * t - 0.5 * g * t**2)
 
 
-def test_move_small_steps_same_as_big_step():
-    # 10 steps of 0.3 land on the same parabola as 1 step of 3
-    ball = (0, 0, 7, 4)
-    for i in range(10):
-        ball = physics.move(*ball, 0.5, 0.3)
-    assert ball == pytest.approx(physics.move(0, 0, 7, 4, 0.5, 3))
+def test_vel_at_launch():
+    xvel, yvel = physics.get_vel(0, np.pi/6, 10, 1)
+    assert (xvel, yvel) == pytest.approx((10*np.cos(np.pi/6),
+                                          10*np.sin(np.pi/6)))
+
+
+def test_gravity_slows_yvel():
+    # gravity only changes yvel, xvel stays the same
+    assert physics.get_vel(4, 0, 10, 2) == pytest.approx((10, -8))
 
 
 # =============================================================================
@@ -122,10 +135,6 @@ def test_bounce_moving_away_from_wall():
     assert (xvel, yvel) == pytest.approx((-10, 3))
 
 
-def test_no_bounce_inside():
-    assert bounce(500, 450, 10, 3) == pytest.approx((500, 450, 10, 3))
-
-
 def test_reflect_matches_readme_equation():
     # v' = (1 - mu) v - (1 - mu + e) (v.n) n, with n pointing into the board
     rng = np.random.default_rng(0)
@@ -153,32 +162,38 @@ def test_bounce_diagonal():
 # Step
 # =============================================================================
 
-def test_step_free_flight():
-    # away from the wall and without drag, step is just move
-    assert step(400, 400, 3, 2, 0.3, 0.6) == pytest.approx(
-        physics.move(400, 400, 3, 2, 0.3, 0.6))
-
-
-def test_step_follows_parabola():
-    ball = (400, 400, 2, 3)
+def test_step_follows_trajectory():
+    # without a bounce or drag the ball stays on one trajectory, t just grows
+    ball = (0, 0.4, 400, 400, 5)
     for i in range(15):
-        ball = step(*ball, 0.3, 0.6)
-    t = 15 * 0.6
-    assert ball[0] == pytest.approx(400 + 2*t)
-    assert ball[1] == pytest.approx(400 + 3*t - 0.5*0.3*t**2)
+        ball = step(ball, 0.3, 0.6)
+    assert ball[0] == pytest.approx(15 * 0.6)
+    assert ball[1:] == pytest.approx((0.4, 400, 400, 5))
 
 
 def test_step_with_drag_moves_one_timestep():
-    # with drag on, the ball should still only move one timestep per step
-    xpos, _, _, _ = step(400, 400, 10, 0, 0, 0.6, k=0.005)
-    assert xpos - 400 == pytest.approx(10 * (1 - 0.005)**0.6 * 0.6)
+    # with drag on, the ball is launched again every timestep but should
+    # still only move one timestep
+    ball = step(launch(400, 400, 10, 0), 0, 0.6, k=0.005)
+    t, theta, x0, y0, v0 = ball
+    assert t == 0
+    assert x0 - 400 == pytest.approx(10 * 0.6)
+    assert v0 == pytest.approx(10 * (1 - 0.005)**0.6)
 
 
 def test_step_bounce_lands_on_wall():
-    # a step that goes past the wall ends on the boundary, not past it
-    xpos, ypos, xvel, yvel = step(728, 400, 10, 0, 0, 1, e=0.8)
+    # a step that goes past the wall ends on the boundary, and the ball is
+    # launched again from there
+    ball = step(launch(728, 400, 10, 0), 0, 1, e=0.8)
+    xpos, ypos = physics.get_pos(*ball, 0)
+    assert ball[0] == 0
     assert dist(xpos, ypos) == pytest.approx(330)
-    assert (xvel, yvel) == pytest.approx((-8, 0))
+    assert physics.get_vel(*ball[:2], ball[4], 0) == pytest.approx((-8, 0))
+
+
+def test_no_bounce_inside():
+    assert not physics.hit(500, 450, cent, rad, ball_rad, 0)
+    assert physics.hit(735, 400, cent, rad, ball_rad, 0)
 
 
 # =============================================================================
@@ -238,11 +253,13 @@ def test_ball_stays_inside(sides, deg):
     # settings from main.py, ball should never leave the board, however the
     # shape is turned
     tilt = np.deg2rad(deg)
-    ball = (400, 400, 10*np.cos(np.deg2rad(20)), 10*np.sin(np.deg2rad(20)))
-    furthest = -rad
-    for i in range(3000):
-        ball = physics.step(*ball, cent, rad, ball_rad, sides, 0.3, 0.6,
-                            0.9, 0.05, 0.005, tilt)
-        furthest = max(furthest, furthest_past_wall(ball[0], ball[1], sides,
-                                                    tilt))
-    assert furthest <= 1e-9
+    for k in [0, 0.005]:
+        ball = (0, np.deg2rad(20), 400, 400, 10)
+        furthest = -rad
+        for i in range(3000):
+            ball = physics.step(*ball, cent, rad, ball_rad, sides, 0.3, 0.6,
+                                0.9, 0.05, k, tilt)
+            xpos, ypos = physics.get_pos(*ball, 0.3)
+            furthest = max(furthest, furthest_past_wall(xpos, ypos, sides,
+                                                        tilt))
+        assert furthest <= 1e-9

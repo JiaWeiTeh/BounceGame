@@ -48,8 +48,8 @@ g = 0.3
 e = 0.9
 # friction with the wall, slows the ball along the wall at each bounce
 mu = 0.05
-# air drag
-k = 0.005
+# air drag, 0 for none so the ball follows one parabola between bounces
+k = 0
 # timestep
 dt = 0.6   # fast/slow motion by changing dt
 
@@ -166,14 +166,16 @@ def main(argv=None):
         # plot ball
         plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=ball_ms)
         plot_balls.append(plot_ball)
-        # launch ball from (x0, y0) with speed v0 at angle theta
-        balls.append([x0, y0, v0 * np.cos(theta), v0 * np.sin(theta)])
+        # launch ball from (x0, y0) with speed v0 at angle theta. each ball is
+        # (t, theta, x0, y0, v0), the same order get_pos takes them
+        balls.append((0, theta, x0, y0, v0))
     if len(shapes) > 1:
         fig.tight_layout()
 
     def init():
         for ball, plot_ball in zip(balls, plot_balls):
-            plot_ball.set_data([ball[0]], [ball[1]])
+            xpos, ypos = physics.get_pos(*ball, g)
+            plot_ball.set_data([xpos], [ypos])
         return plot_balls
 
     def animate(i):
@@ -182,7 +184,8 @@ def main(argv=None):
                 balls[j] = physics.step(*balls[j], cent, rad, ball_rad,
                                         sides[shape], g, dt, e, mu, k,
                                         turns[j])
-            plot_balls[j].set_data([balls[j][0]], [balls[j][1]])
+            xpos, ypos = physics.get_pos(*balls[j], g)
+            plot_balls[j].set_data([xpos], [ypos])
         return plot_balls
 
     anim = animation.FuncAnimation(fig, animate, init_func=init,

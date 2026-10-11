@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Functions to draw the boundary and to move and bounce the ball."""
+"""Functions to draw the boundary, and to move and bounce the ball."""
 
 import numpy as np
 
@@ -22,16 +22,24 @@ def draw(ax, rad, cent, sides=0, tilt=0):
     ax.plot(x, y, c='green')
 
 
-def move(xpos, ypos, xvel, yvel, g, dt):
+def get_vel(t, theta, vel, g):
     """
-    Return position and velocity after a time dt, from the trajectory equation.
+    Return velocity component at time t given initial launching angle.
     """
-    # projectile motion, exact for any dt since g is constant
-    xpos = xpos + xvel * dt
-    ypos = ypos + yvel * dt - 0.5 * g * dt**2
-    yvel = yvel - g * dt
+    xvel = vel * np.cos(theta)
+    yvel = vel * np.sin(theta) - g * t
 
-    return xpos, ypos, xvel, yvel
+    return xvel, yvel
+
+
+def get_pos(t, theta, x0, y0, vel, g):
+    """
+    Return position (x,y) at time t given initial launching angle and position.
+    """
+    xpos = vel * np.cos(theta) * t + x0
+    ypos = vel * np.sin(theta) * t - 0.5 * g * t**2 + y0
+
+    return xpos, ypos
 
 
 def drag(xvel, yvel, k, dt):
@@ -67,6 +75,17 @@ def walls(xpos, ypos, cent, rad, sides, tilt=0):
     return [(np.cos(phi), np.sin(phi), a) for phi in angle]
 
 
+def hit(xpos, ypos, cent, rad, ball_rad, sides, tilt=0):
+    """
+    Check if the ball has gone past any wall of the boundary.
+    """
+    for nx, ny, a in walls(xpos, ypos, cent, rad, sides, tilt):
+        if (xpos - cent) * nx + (ypos - cent) * ny - (a - ball_rad) > 1e-9:
+            return True
+
+    return False
+
+
 def reflect(xvel, yvel, nx, ny, e, mu):
     """
     Bounce velocity off a wall whose norm (nx, ny) points inwards.
@@ -78,8 +97,8 @@ def reflect(xvel, yvel, nx, ny, e, mu):
         return xvel, yvel
     vn_x, vn_y = [vn * nx, vn * ny]
     vt_x, vt_y = [xvel - vn_x, yvel - vn_y]
-    # 2. reverse normal component (energy loss from e), and slow down
-    # tangential component from friction mu
+    # 2. law of restitution: reverse normal component and scale it by e.
+    # friction mu slows down the tangential component
     xvel = (1 - mu) * vt_x - e * vn_x
     yvel = (1 - mu) * vt_y - e * vn_y
 
@@ -109,14 +128,31 @@ def bounce(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides, e, mu,
     return xpos, ypos, xvel, yvel
 
 
-def step(xpos, ypos, xvel, yvel, cent, rad, ball_rad, sides, g, dt, e, mu,
-         k, tilt=0):
+def step(t, theta, x0, y0, v0, cent, rad, ball_rad, sides, g, dt, e, mu, k,
+         tilt=0):
     """
-    Move the ball by one timestep dt, and bounce it if it hits the boundary.
-    """
-    xvel, yvel = drag(xvel, yvel, k, dt)
-    xpos, ypos, xvel, yvel = move(xpos, ypos, xvel, yvel, g, dt)
-    xpos, ypos, xvel, yvel = bounce(xpos, ypos, xvel, yvel,
-                                    cent, rad, ball_rad, sides, e, mu, tilt)
+    Move the ball on by one timestep dt along its trajectory. If it goes past
+    the boundary, bounce it off and launch it again from there.
 
-    return xpos, ypos, xvel, yvel
+    The ball is (t, theta, x0, y0, v0): time since launch, launch angle,
+    launch point and launch speed. Returns the ball after the timestep.
+    """
+    t = t + dt
+    xpos, ypos = get_pos(t, theta, x0, y0, v0, g)
+    bounced = hit(xpos, ypos, cent, rad, ball_rad, sides, tilt)
+
+    # with air drag the ball slows down a little every timestep, so it needs
+    # a new launch every timestep too. without drag only after a bounce
+    if bounced or k > 0:
+        xvel, yvel = get_vel(t, theta, v0, g)
+        if bounced:
+            xpos, ypos, xvel, yvel = bounce(xpos, ypos, xvel, yvel, cent, rad,
+                                            ball_rad, sides, e, mu, tilt)
+        xvel, yvel = drag(xvel, yvel, k, dt)
+        # launch again from here, with t = 0
+        t = 0
+        theta = np.arctan2(yvel, xvel)
+        x0, y0 = [xpos, ypos]
+        v0 = np.sqrt(xvel**2 + yvel**2)
+
+    return t, theta, x0, y0, v0

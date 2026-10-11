@@ -8,30 +8,37 @@ high school maths behind it and visualise it with Python and Matplotlib.
 
 ## The maths
 
-Between bounces the ball follows one trajectory equation, projectile motion
-under gravity:
+The ball is launched from a point $(x_0, y_0)$ with speed $v_0$ at an angle
+$\theta$. Between bounces it follows one trajectory equation, projectile
+motion under gravity, where $t$ is the time since the launch:
 
 ```math
-x = x_0 + v_x t, \qquad y = y_0 + v_y t - \tfrac{1}{2} g t^2
+x = x_0 + v_0 \cos\theta \, t, \qquad y = y_0 + v_0 \sin\theta \, t - \tfrac{1}{2} g t^2
 ```
 
-When the ball hits a wall, one equation sets its new velocity:
+When the ball hits a wall it bounces off by Newton's law of restitution. The
+part of its velocity going into the wall is reversed and scaled by the
+coefficient of restitution $e$. Friction with the wall scales the part along
+the wall by $1 - \mu$. Together they give the new velocity:
 
 ```math
 \mathbf{v}' = (1 - \mu)\,\mathbf{v} - (1 - \mu + e)\,(\mathbf{v} \cdot \hat{\mathbf{n}})\,\hat{\mathbf{n}}
 ```
 
 Here $\hat{\mathbf{n}}$ is the unit vector pointing out of the wall, into the
-board. $e$ is the coefficient of restitution and $\mu$ is the friction with
-the wall. The part of the velocity going into the wall is reversed and scaled
-by $e$, and the part along the wall is scaled by $1 - \mu$. With $e = 1$ and
-$\mu = 0$ it becomes a perfect mirror bounce,
+board. With $e = 1$ and $\mu = 0$ it is a perfect mirror bounce,
 $\mathbf{v}' = \mathbf{v} - 2(\mathbf{v} \cdot \hat{\mathbf{n}})\,\hat{\mathbf{n}}$.
-In flight, air drag also scales the speed by $(1 - k)$ per unit of time.
+The ball is then launched again from the bounce point, with $t$ back at 0,
+speed $v_0 = |\mathbf{v}'|$ and angle $\theta = \arctan(v'_y / v'_x)$, taken
+in the right quadrant.
 
 The shape of the boundary only changes $\hat{\mathbf{n}}$. In a circle it
 points from the ball towards the centre. In a polygon it is fixed for each
 side. That is why every shape uses the same code.
+
+Air drag is off by default. Setting $k > 0$ scales the speed by $(1 - k)$ per
+unit of time, and the ball is then launched again every timestep with its
+slower velocity.
 
 ## Install
 
@@ -102,7 +109,7 @@ Edit the values at the top of `main.py`. The main ones are:
 | `g` | 0.3 | Gravitational acceleration |
 | `e` | 0.9 | Coeff of restitution: share of speed into the wall kept per bounce (0–1) |
 | `mu` | 0.05 | Friction: share of speed along the wall lost per bounce (0–1) |
-| `k` | 0.005 | Air drag: share of speed lost per unit time in flight (0–1) |
+| `k` | 0 | Air drag: share of speed lost per unit time in flight (0–1), off by default |
 | `dt` | 0.6 | Timestep per frame |
 
 Units are arbitrary: distances are plot coordinates and time is simulation
@@ -111,7 +118,7 @@ time.
 ## Files
 
 - `main.py` holds the settings, draws the board and runs the animation.
-- `physics.py` holds the functions for the motion, bounce and drag.
+- `physics.py` holds the functions for the trajectory, bounce and drag.
 - `test_physics.py` and `test_main.py` hold the tests.
 - `assets/bounce.gif` is the demo animation of all six shapes.
 
