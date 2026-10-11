@@ -27,3 +27,14 @@ def test_save_mp4(tmp_path):
 def test_save_wrong_extension(tmp_path):
     with pytest.raises(SystemExit, match="gif or .mp4"):
         main.main(["--save", str(tmp_path / "bounce.avi")])
+
+
+def test_save_other_shape(tmp_path):
+    out = tmp_path / "square.gif"
+    main.main(["--save", str(out), "--seconds", "0.4", "--shape", "square"])
+    assert out.read_bytes()[:6] == b"GIF89a"
+
+
+def test_wrong_shape():
+    with pytest.raises(SystemExit):
+        main.main(["--shape", "star"])

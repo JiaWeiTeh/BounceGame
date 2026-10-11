@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Ball bouncing inside a circular boundary.
+Ball bouncing inside a circular boundary, or a triangle, square, etc.
 
-Run `python main.py` to watch it, or `python main.py --save bounce.gif` to
-save it as a video.
+Run `python main.py` to watch it, `python main.py --shape square` for another
+shape, or `python main.py --save bounce.gif` to save it as a video.
 """
 
 import argparse
@@ -19,7 +19,12 @@ import physics
 # =============================================================================
 # dimension of board
 boardx, boardy = [800, 800]
-# radius and center of circle
+# shape of the boundary, and how many sides it has (0 for a circle)
+shape = 'circle'
+sides = {'circle': 0, 'triangle': 3, 'square': 4, 'pentagon': 5,
+         'hexagon': 6, 'octagon': 8}
+# center of board, and radius of circle (or distance to the corners of the
+# other shapes)
 cent = 400
 rad = 340
 # empty space around the board in the plot
@@ -64,7 +69,7 @@ def get_args(argv=None):
     Read options from the command line.
     """
     parser = argparse.ArgumentParser(
-        description="Ball bouncing inside a circular boundary."
+        description="Ball bouncing inside a circle, or another shape."
     )
     parser.add_argument(
         '--save', metavar='FILE',
@@ -74,6 +79,10 @@ def get_args(argv=None):
     parser.add_argument(
         '--seconds', type=float, default=seconds,
         help="length of the saved video in seconds (default: %(default)s)",
+    )
+    parser.add_argument(
+        '--shape', choices=sides, default=shape,
+        help="shape of the boundary (default: %(default)s)",
     )
     return parser.parse_args(argv)
 
@@ -115,7 +124,8 @@ def main(argv=None):
     ax = plt.axes(xlim=(0-pad, boardx+pad), ylim=(0-pad, boardy+pad))
     ax.xaxis.set_ticks([])
     ax.yaxis.set_ticks([])
-    physics.draw(ax, rad, cent)
+    nsides = sides[args.shape]
+    physics.draw(ax, rad, cent, nsides)
     # plot ball
     plot_ball, = ax.plot([], [], 'o', mec='k', mfc='w', ms=ball_ms)
     # launch ball from (x0, y0) with speed v0 at angle theta
@@ -130,7 +140,7 @@ def main(argv=None):
         nonlocal xpos, ypos, xvel, yvel
         for _ in range(steps):
             xpos, ypos, xvel, yvel = physics.step(xpos, ypos, xvel, yvel,
-                                                  cent, rad, ball_rad,
+                                                  cent, rad, ball_rad, nsides,
                                                   g, dt, e, mu, k)
         plot_ball.set_data([xpos], [ypos])
         return plot_ball,
